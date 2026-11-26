@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0f1512">
+<meta name="robots" content="noindex">
+<title>MDF Back Office</title>
+<script>
+(function(){try{
+  var t=localStorage.getItem('mdfbo_theme')||'auto', w=localStorage.getItem('mdfbo_warm')==='1';
+  if(t!=='auto')document.documentElement.setAttribute('data-theme',t);
+  if(w)document.documentElement.setAttribute('data-warm','1');
+}catch(e){}})();
+</script>
+<style>
+:root{--bg:#0f1512;--panel:#161f1a;--raised:#1e2a23;--line:#2b3a31;--text:#ecf2ea;--muted:#9fb0a2;--accent:#e8b923;--accent-ink:#e8b923;--on-accent:#1b1500;--ok:#5cc27a;--bad:#e2735c;--warn:#e0a83a;--r:14px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+:root[data-theme=light]{--bg:#f4f2ea;--panel:#fffdf7;--raised:#fff;--line:#e2dccb;--text:#1b261e;--muted:#5b675c;--accent-ink:#7a5c00;--ok:#2c8a4a;--bad:#b3452f;--warn:#8a5a00}
+@media (prefers-color-scheme: light){:root:not([data-theme=dark]){--bg:#f4f2ea;--panel:#fffdf7;--raised:#fff;--line:#e2dccb;--text:#1b261e;--muted:#5b675c;--accent-ink:#7a5c00;--ok:#2c8a4a;--bad:#b3452f;--warn:#8a5a00}}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--font)}
+html[data-warm="1"]::after{content:"";position:fixed;inset:0;background:#ff9a2e;opacity:.16;mix-blend-mode:multiply;pointer-events:none;z-index:999}
+.top{display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top b{font-size:17px}.top b span{color:var(--accent-ink)}.sp{flex:1}
+body.signin .top .pills{display:none}
+.pill{border:1px solid var(--line);background:var(--raised);color:var(--text);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
+.tabs{display:flex;gap:4px;padding:8px 18px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;color:var(--muted);padding:8px 12px;border-radius:10px;font:inherit;cursor:pointer;white-space:nowrap}
+.tabs button[aria-current=page]{background:var(--raised);color:var(--text);font-weight:700}
+main{max-width:1100px;margin:0 auto;padding:18px}
+h1{font-size:22px;margin:4px 0 14px}h2{font-size:17px;margin:18px 0 8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.kpi .v{font-size:30px;font-weight:800}.kpi .l{color:var(--muted);font-size:13px}.kpi .d{font-size:12px;color:var(--muted);margin-top:4px}
+.kpi.na .v{color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
+.btn{border:1px solid var(--line);background:var(--raised);color:var(--text);border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.btn.acc{background:var(--accent);color:var(--on-accent);border-color:transparent}
+input,select,textarea{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--raised);color:var(--text);font:inherit}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0 12px}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:999px;background:var(--raised);border:1px solid var(--line)}
+.tag.sample{color:var(--accent-ink);border-style:dashed}
+.err{background:var(--raised);border:1px solid var(--bad);color:var(--text);padding:10px;border-radius:10px;margin:10px 0}
+.muted{color:var(--muted)}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+/* sign-in card */
+.login{max-width:400px;margin:40px auto;padding:22px}
+.login .prov{display:flex;align-items:center;gap:10px;width:100%;justify-content:center;margin:6px 0;padding:10px}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);margin:12px 0}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.status{margin-top:10px;font-size:14px}.status:empty{display:none}
+.hidden{display:none!important}
+</style>
+</head>
+<body class="signin">
+<div class="top"><b>M<span>DF</span> · Back Office</b><span class="sp"></span>
+  <span class="pills"><button class="pill" data-theme-btn>Auto</button> <button class="pill" data-warm-btn role="switch" aria-checked="false">Warm</button> <button class="pill" id="signout">Sign out</button></span>
+</div>
+<nav class="tabs hidden" id="tabs"></nav>
+<main id="app"></main>
+
+<!-- Sign-in (standard back-office screen) -->
+<template id="tpl-login">
+<div class="card login" id="view-login">
+  <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px"><button class="pill" data-theme-btn>Auto</button><button class="pill" data-warm-btn role="switch" aria-checked="false">Warm</button></div>
+  <h1 style="text-align:center;margin-bottom:2px">Sign in</h1>
+  <p class="muted" style="text-align:center;margin-top:0">PROMAS Digital Farmer Learning &amp; Extension</p>
+  <button class="btn prov" data-prov="google">G&nbsp; Sign in with Google</button>
+  <button class="btn prov" data-prov="apple"> Sign in with Apple</button>
+  <button class="btn prov" data-prov="azure">⊞ Sign in with Microsoft</button>
+  <button class="btn prov" data-prov="custom:yahoo">Y! Sign in with Yahoo</button>
+  <button class="btn prov" id="passkey">🔑 Sign in with a passkey</button>
+  <div class="or">or</div>
+  <label for="em">Email</label><input id="em" type="email" autocomplete="username">
+  <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">
+  <div style="display:flex;gap:8px;margin-top:12px"><button class="btn acc" style="flex:1" id="signin">Sign in</button><button class="btn" style="flex:1" id="signup">Create account</button></div>
+  <div style="text-align:center;margin-top:8px"><button class="btn" style="border:0;background:none" id="forgot">Forgot password?</button></div>
+  <div class="status" id="status"></div>
+  <p class="muted" style="font-size:13px">First time? Sign in with email and password once, then link Google, Apple, Microsoft, Yahoo or a passkey under Settings → Sign-in methods. The first account that signs in becomes the admin.</p>
+</div>
+</template>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm';
+const APP_VERSION = '1.0.0';
+const SUPABASE_URL = 'https://osbwuklsslvuaqhbezzc.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_UHvM6rIuT7ejO0DPNBmM-g_3A34DJdY';
+const MODULES = { m1:'1 Preparing for planting', m2:'2 Planting correctly', m3:'3 Early crop management', m4:'4 Crop protection', m5:'5 Harvesting & marketing' };
+
+// Read recovery / errors from the URL before creating the client
+const urlBits = new URLSearchParams(location.hash.slice(1) + '&' + location.search.slice(1));
+let recovery = urlBits.get('type') === 'recovery';
+const urlError = urlBits.get('error_description');
+const configured = !SUPABASE_URL.startsWith('__');
+const sb = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ storageKey:'mdfbo_auth', persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } }) : null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tab = 'overview', role = null;
+
+/* ---------- Appearance ---------- */
+function syncAppearance(){
+  const th = localStorage.getItem('mdfbo_theme') || 'auto', w = localStorage.getItem('mdfbo_warm') === '1';
+  document.querySelectorAll('[data-theme-btn]').forEach(b => b.textContent = th==='auto'?'Auto':th==='dark'?'Dark':'Light');
+  document.querySelectorAll('[data-warm-btn]').forEach(b => b.setAttribute('aria-checked', String(w)));
+  const dark = th==='dark' || (th==='auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelector('meta[name=theme-color]').content = dark ? '#0f1512' : '#f4f2ea';
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-theme-btn]')) { const o=['dark','light','auto'], c=localStorage.getItem('mdfbo_theme')||'auto', n=o[(o.indexOf(c)+1)%3]; localStorage.setItem('mdfbo_theme', n); n==='auto'?document.documentElement.removeAttribute('data-theme'):document.documentElement.setAttribute('data-theme', n); syncAppearance(); }
+  if (e.target.closest('[data-warm-btn]')) { const w=localStorage.getItem('mdfbo_warm')!=='1'; localStorage.setItem('mdfbo_warm', w?'1':'0'); w?document.documentElement.setAttribute('data-warm','1'):document.documentElement.removeAttribute('data-warm'); syncAppearance(); }
+});
+
+/* ---------- Auth ---------- */
+const plain = m => {
+  m = String(m||'');
+  if (/provider is not enabled|Unsupported provider/i.test(m)) return "This sign-in option isn't switched on in Supabase yet; SIGNIN.md has the steps.";
+  if (/Signups not allowed/i.test(m)) return 'New sign-ups are switched off. Ask the admin to add you.';
+  if (/Manual linking is disabled/i.test(m)) return 'Turn on "Allow manual linking" in Supabase → Authentication → Sign In / Providers.';
+  if (/NotAllowedError|AbortError/i.test(m)) return 'The passkey prompt was closed. Nothing changed.';
+  return m;
+};
+function setStatus(m){ const s=$('#status'); if(s) s.textContent = m || ''; }
+function showLogin(msg){
+  document.body.classList.add('signin'); $('#tabs').classList.add('hidden');
+  $('#app').innerHTML = $('#tpl-login').innerHTML; syncAppearance();
+  if (!configured) setStatus('Not connected yet: put the Supabase URL and anon key in index.html (SETUP.md step 2).');
+  if (msg) setStatus(msg);
+  document.querySelectorAll('[data-prov]').forEach(b => b.onclick = () => oauth(b.dataset.prov));
+  $('#passkey').onclick = async () => { try { const { error } = await sb.auth.signInWithPasskey?.() ?? { error:{ message:'Passkeys need supabase-js 2.118+ and Supabase passkeys switched on.' } }; if (error) setStatus(plain(error.message)); } catch(e){ setStatus(plain(e.name||e.message)); } };
+  $('#signin').onclick = async () => { if(!sb) return; const { error } = await sb.auth.signInWithPassword({ email:$('#em').value.trim(), password:$('#pw').value }); if (error) setStatus(plain(error.message)); };
+  $('#signup').onclick = async () => { if(!sb) return; const { error } = await sb.auth.signUp({ email:$('#em').value.trim(), password:$('#pw').value, options:{ emailRedirectTo: location.origin+location.pathname } }); setStatus(error ? plain(error.message) : 'Check your email to confirm, then sign in.'); };
+  $('#forgot').onclick = async () => { const em=$('#em').value.trim(); if(!em) return setStatus('Type your email first, then tap Forgot password.'); const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin+location.pathname }); setStatus(error ? plain(error.message) : 'Reset link sent. Check your email.'); };
+}
+async function oauth(provider){
+  if(!sb) return;
+  const { data, error } = await sb.auth.signInWithOAuth({ provider, options:{ redirectTo: location.origin+location.pathname, skipBrowserRedirect:true } });
+  if (error) return setStatus(plain(error.message));
+  try { const r = await fetch(data.url, { redirect:'manual' }); if (r.status >= 400 && r.status < 500) { const j = await r.json().catch(()=>({})); return setStatus(plain(j.msg || j.error_description || 'provider is not enabled')); } } catch(e){}
+  location.assign(data.url);
+}
+function showRecovery(){
+  document.body.classList.add('signin');
+  $('#app').innerHTML = `<div class="card login"><h1>Choose a new password</h1><label>New password</label><input id="np1" type="password"><label>Again</label><input id="np2" type="password"><button class="btn acc" style="width:100%;margin-top:12px" id="npgo">Save</button><div class="status" id="status"></div></div>`;
+  $('#npgo').onclick = async () => { if ($('#np1').value !== $('#np2').value) return setStatus("The two passwords don't match."); const { error } = await sb.auth.updateUser({ password:$('#np1').value }); if (error) return setStatus(plain(error.message)); recovery=false; boot(); };
+}
+
+/* ---------- Data helpers (1,000-row pages) ---------- */
+async function all(table, select='*', order='created_at'){
+  const out=[]; for (let from=0;;from+=1000){ const { data, error } = await sb.from(table).select(select).order(order,{ascending:false}).range(from, from+999); if (error) throw error; out.push(...data); if (data.length < 1000) break; } return out;
+}
+const csvCell = v => { let s = v==null?'':(typeof v==='object'?JSON.stringify(v):String(v)); if (/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s.replace(/"/g,'""')+'"'; };
+function downloadCSV(name, rows){ if(!rows.length) return; const cols=Object.keys(rows[0]); const csv=[cols.join(','), ...rows.map(r=>cols.map(c=>csvCell(r[c])).join(','))].join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=`mdf_${name}_${new Date().toISOString().slice(0,10)}.csv`; a.click(); }
+const canEdit = () => role==='editor' || role==='owner';
+const sampleTag = r => r.is_sample ? ' <span class="tag sample">sample</span>' : '';
+
+/* ---------- Tabs ---------- */
+const TABS = {
+  async overview(){
+    const [{ data:k, error }, sessions] = await Promise.all([ sb.from('v_indicators').select('*').single(), all('training_sessions','module_id,farmers_present,could_demonstrate,district,created_at') ]);
+    if (error) throw error;
+    const byMod = {}; sessions.forEach(s => { const m = byMod[s.module_id] ||= { n:0, f:0, c:0 }; m.n++; m.f+=s.farmers_present; m.c+=s.could_demonstrate; });
+    const kpi = (v,l,d,na) => `<div class="card kpi ${na?'na':''}"><div class="v">${v ?? '—'}</div><div class="l">${l}</div><div class="d">${d}</div></div>`;
+    return `<h1>Overview</h1>
+    <div class="kpis">
+      ${kpi(k.reach_farmers,'Reach: farmers trained', `${k.reach_women} women`)}
+      ${kpi(k.active_lead_farmers_30d,'Engagement: active lead farmers (30 days)', `of ${k.lead_farmers_total} registered`)}
+      ${kpi(k.quality_pct_full_sequence==null?null:k.quality_pct_full_sequence+'%','Quality: sessions with all 6 steps','Introduce → Reinforce')}
+      ${kpi(k.learning_pct_demonstrate==null?null:k.learning_pct_demonstrate+'%','Learning: could demonstrate','the key indicator')}
+      ${kpi(null,'Adoption','needs a follow-up farm visit survey (KoboToolbox/ODK)',true)}
+      ${kpi(null,'Productivity','yield: demo plots vs comparison farms',true)}
+      ${kpi(null,'Efficiency','cost per farmer reached: add a costs sheet',true)}
+      ${kpi(null,'Sustainability','% agrodealers still funding it after PROMAS',true)}
+    </div>
+    <h2>Learning by module</h2>
+    <div class="card"><table><tr><th>Module</th><th>Sessions</th><th>Farmers</th><th>Could demonstrate</th></tr>
+      ${Object.keys(MODULES).map(id=>{ const m=byMod[id]||{n:0,f:0,c:0}; const p=m.f?Math.round(100*m.c/m.f):0; return `<tr><td>${MODULES[id]}</td><td>${m.n}</td><td>${m.f}</td><td><div class="bar"><i style="width:${p}%"></i></div> ${m.f?p+'%':'—'}</td></tr>`; }).join('')}
+    </table></div>
+    <h2>Pipeline health</h2>
+    <div class="card"><table><tr><th>Table</th><th>Rows</th><th>Latest</th></tr>
+      ${await healthRows()}</table></div>`;
+  },
+  async sessions(){
+    const rows = await all('training_sessions');
+    window._export = () => downloadCSV('sessions', rows);
+    return `<h1>Training sessions <button class="btn" onclick="_export()">Export CSV</button></h1><div class="card"><table>
+      <tr><th>When</th><th>Lead farmer</th><th>Village / district</th><th>Module</th><th>Steps</th><th>Present (women)</th><th>Could demonstrate</th></tr>
+      ${rows.map(r=>`<tr><td>${esc(r.created_at.slice(0,16).replace('T',' '))}</td><td>${esc(r.lead_farmer||'—')}${sampleTag(r)}</td><td>${esc(r.village||'')} ${esc(r.district||'')}</td><td>${esc(MODULES[r.module_id]||r.module_id)}</td><td>${r.steps_completed}/6</td><td>${r.farmers_present} (${r.women_present})</td><td>${r.could_demonstrate}</td></tr>`).join('') || '<tr><td colspan=7 class="muted">No sessions yet. They arrive when lead farmers finish a lesson and have signal.</td></tr>'}
+    </table></div>`;
+  },
+  async plots(){
+    const [plots, lfs] = await Promise.all([ all('demo_plots'), all('lead_farmers','id,name,village') ]);
+    const lfName = id => (lfs.find(l=>l.id===id)||{}).name || '—';
+    window._export = () => downloadCSV('demo_plots', plots);
+    window._addPlot = async () => {
+      const v = id => $('#'+id).value.trim() || null;
+      const { error } = await sb.from('demo_plots').insert({ lead_farmer_id:v('p_lf'), crop:v('p_crop'), variety:v('p_var'), planting_date:v('p_date'), lat:v('p_lat')&&+v('p_lat'), lon:v('p_lon')&&+v('p_lon'), status:v('p_status') });
+      if (error) return alertBox(error); render();
+    };
+    window._gps = () => navigator.geolocation?.getCurrentPosition(p => { $('#p_lat').value = p.coords.latitude.toFixed(5); $('#p_lon').value = p.coords.longitude.toFixed(5); });
+    return `<h1>Demonstration plots <button class="btn" onclick="_export()">Export CSV</button></h1>
+    ${canEdit()?`<div class="card"><b>Add a plot</b><div class="form">
+      <div><label>Lead farmer</label><select id="p_lf"><option value="">—</option>${lfs.map(l=>`<option value="${l.id}">${esc(l.name)} · ${esc(l.village||'')}</option>`).join('')}</select></div>
+      <div><label>Crop</label><select id="p_crop"><option>maize</option><option>groundnut</option><option>sesame</option><option>pigeonpea</option></select></div>
+      <div><label>Variety</label><input id="p_var"></div>
+      <div><label>Planting date</label><input id="p_date" type="date"></div>
+      <div><label>Latitude</label><input id="p_lat" inputmode="decimal"></div>
+      <div><label>Longitude <a href="#" onclick="_gps();return false">use my GPS</a></label><input id="p_lon" inputmode="decimal"></div>
+      <div><label>Status</label><select id="p_status"><option>planned</option><option>established</option><option>harvested</option><option>abandoned</option></select></div>
+    </div><button class="btn acc" style="margin-top:12px" onclick="_addPlot()">Save plot</button></div><br>`:''}
+    <div class="card"><table><tr><th>Lead farmer</th><th>Crop / variety</th><th>Planted</th><th>Week</th><th>Status</th><th>Map</th><th>Yield kg/ha</th></tr>
+      ${plots.map(p=>{ const wk = p.planting_date ? Math.floor((Date.now()-new Date(p.planting_date))/604800000) : null;
+        return `<tr><td>${esc(lfName(p.lead_farmer_id))}${sampleTag(p)}</td><td>${esc(p.crop)} ${esc(p.variety||'')}</td><td>${esc(p.planting_date||'—')}</td><td>${wk??'—'}</td><td><span class="tag">${esc(p.status)}</span></td><td>${p.lat!=null?`<a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=15/${p.lat}/${p.lon}">OSM</a>`:'—'}</td><td>${p.final_yield_kg_ha??'—'}</td></tr>`; }).join('') || '<tr><td colspan=7 class="muted">No plots yet.</td></tr>'}
+    </table></div>
+    <p class="muted">Photos and stage-by-stage observations: technicians collect them offline with a KoboToolbox form (see SETUP.md step 6) and import them into plot observations.</p>`;
+  },
+  async questions(){
+    const rows = await all('feedback');
+    window._answer = async id => { const a = prompt('Answer (it is saved here; send it back to the lead farmer on WhatsApp):'); if(!a) return; const { error } = await sb.from('feedback').update({ answer:a, status:'answered', answered_at:new Date().toISOString() }).eq('id', id); if (error) return alertBox(error); render(); };
+    window._escalate = async id => { const { error } = await sb.from('feedback').update({ status:'escalated' }).eq('id', id); if (error) return alertBox(error); render(); };
+    return `<h1>Questions from lead farmers</h1><div class="card"><table><tr><th>When</th><th>Where</th><th>Question</th><th>Status</th><th></th></tr>
+      ${rows.map(r=>`<tr><td>${esc(r.created_at.slice(0,10))}</td><td>${esc(r.village||'')} ${esc(r.district||'')}</td><td>${esc(r.message)}${r.answer?`<div class="muted">↳ ${esc(r.answer)}</div>`:''}${sampleTag(r)}</td><td><span class="tag">${esc(r.status)}</span></td><td>${canEdit()&&r.status!=='answered'?`<button class="btn" onclick="_answer(${r.id})">Answer</button> <button class="btn" onclick="_escalate(${r.id})">To content team</button>`:''}</td></tr>`).join('') || '<tr><td colspan=5 class="muted">No questions yet.</td></tr>'}
+    </table></div>`;
+  },
+  async people(){
+    const [dealers, techs, lfs] = await Promise.all([ all('agrodealers'), all('technicians'), all('lead_farmers') ]);
+    const dName = id => (dealers.find(d=>d.id===id)||{}).name || '—';
+    window._addLF = async () => { const v=id=>$('#'+id).value.trim()||null; const { error } = await sb.from('lead_farmers').insert({ name:v('l_name'), sex:v('l_sex'), village:v('l_village'), district:v('l_district'), phone:v('l_phone'), agrodealer_id:v('l_dealer') }); if (error) return alertBox(error); render(); };
+    window._addDealer = async () => { const v=id=>$('#'+id).value.trim()||null; const { error } = await sb.from('agrodealers').insert({ name:v('d_name'), district:v('d_district'), partnership_season:+v('d_season')||1 }); if (error) return alertBox(error); render(); };
+    const season = s => s===1?'New':s===2?'2nd season':'3rd+ (graduating)';
+    return `<h1>Partners &amp; people</h1>
+    <h2>Agrodealers</h2><div class="card"><table><tr><th>Name</th><th>District</th><th>Partnership</th><th>Digital support level</th></tr>
+      ${dealers.map(d=>`<tr><td>${esc(d.name)}${sampleTag(d)}</td><td>${esc(d.district||'')}</td><td>${season(d.partnership_season)}</td><td class="muted">${d.partnership_season===1?'Kits, plot instructions, calendar':d.partnership_season===2?'+ monitoring, regular audio/video, feedback':'Runs content, calendar and monitoring with less PROMAS support'}</td></tr>`).join('')}
+    </table>${canEdit()?`<div class="form"><div><label>Name</label><input id="d_name"></div><div><label>District</label><input id="d_district"></div><div><label>Season</label><select id="d_season"><option>1</option><option>2</option><option>3</option></select></div></div><button class="btn" style="margin-top:10px" onclick="_addDealer()">Add agrodealer</button>`:''}</div>
+    <h2>Lead farmers (${lfs.length})</h2><div class="card"><table><tr><th>Name</th><th>Sex</th><th>Village / district</th><th>Agrodealer</th><th>Phone</th></tr>
+      ${lfs.map(l=>`<tr><td>${esc(l.name)}${sampleTag(l)}</td><td>${esc(l.sex||'')}</td><td>${esc(l.village||'')} ${esc(l.district||'')}</td><td>${esc(dName(l.agrodealer_id))}</td><td>${l.phone?`<a href="https://wa.me/${esc(l.phone.replace(/\D/g,''))}" target="_blank" rel="noopener">${esc(l.phone)}</a>`:''}</td></tr>`).join('')}
+    </table>${canEdit()?`<div class="form"><div><label>Name</label><input id="l_name"></div><div><label>Sex</label><select id="l_sex"><option value="">—</option><option value="f">F</option><option value="m">M</option></select></div><div><label>Village</label><input id="l_village"></div><div><label>District</label><input id="l_district"></div><div><label>Phone</label><input id="l_phone"></div><div><label>Agrodealer</label><select id="l_dealer"><option value="">—</option>${dealers.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></div></div><button class="btn" style="margin-top:10px" onclick="_addLF()">Add lead farmer</button>`:''}</div>`;
+  },
+  async settings(){
+    const { data:{ user } } = await sb.auth.getUser();
+    const ids = (user.identities||[]).map(i=>i.provider);
+    window._link = async p => { const { data, error } = await sb.auth.linkIdentity({ provider:p, options:{ redirectTo:location.origin+location.pathname, skipBrowserRedirect:true } }); if (error) return alert(plain(error.message)); location.assign(data.url); };
+    window._unlink = async p => { const idn = user.identities.find(i=>i.provider===p); const { error } = await sb.auth.unlinkIdentity(idn); if (error) return alert(plain(error.message)); render(); };
+    window._pw = async () => { if ($('#s1').value !== $('#s2').value) return alert("The two passwords don't match."); const { error } = await sb.auth.updateUser({ password:$('#s1').value }); alert(error ? plain(error.message) : 'Password changed.'); };
+    const provs = [['google','Google'],['apple','Apple'],['azure','Microsoft'],['custom:yahoo','Yahoo']];
+    return `<h1>Settings</h1>
+    <div class="card"><h2 style="margin-top:0">Sign-in methods</h2><table><tr><td>Email</td><td>${esc(user.email)}</td><td></td></tr>
+      ${provs.map(([p,n])=>`<tr><td>${n}</td><td>${ids.includes(p)?'Linked':'—'}</td><td>${ids.includes(p)?`<button class="btn" ${ids.length<2?'disabled':''} onclick="_unlink('${p}')">Unlink</button>`:`<button class="btn" onclick="_link('${p}')">Link</button>`}</td></tr>`).join('')}</table></div><br>
+    <div class="card"><h2 style="margin-top:0">Change password</h2><div class="form"><div><label>New password</label><input id="s1" type="password"></div><div><label>Again</label><input id="s2" type="password"></div></div><button class="btn acc" style="margin-top:10px" onclick="_pw()">Save password</button></div><br>
+    <div class="card"><h2 style="margin-top:0">Appearance</h2><p class="muted">Theme cycles Dark → Light → Auto (Auto follows your device). Warm adds an amber layer for night work. Both are saved in this browser.</p>
+      <p>Your role: <b>${esc(role)}</b> · Back office v${APP_VERSION}</p></div>`;
+  }
+};
+async function healthRows(){
+  const tables = [['training_sessions','Training sessions'],['feedback','Questions'],['demo_events','Kit events'],['demo_plots','Demo plots'],['lead_farmers','Lead farmers']];
+  const res = await Promise.all(tables.map(async ([t,l]) => { const { count } = await sb.from(t).select('*',{count:'exact',head:true}); const { data } = await sb.from(t).select('created_at').order('created_at',{ascending:false}).limit(1); return `<tr><td>${l}</td><td>${count??0}</td><td>${data?.[0]?.created_at?.slice(0,16).replace('T',' ')||'—'}</td></tr>`; }));
+  return res.join('');
+}
+function alertBox(e){ $('#app').insertAdjacentHTML('afterbegin', `<div class="err">${esc(plain(e.message||e))} <span class="muted">If this keeps happening, sign out and sign in again.</span></div>`); }
+
+async function render(){
+  const names = { overview:'Overview', sessions:'Sessions', plots:'Demo plots', questions:'Questions', people:'Partners & people', settings:'Settings' };
+  $('#tabs').innerHTML = Object.entries(names).map(([k,n])=>`<button ${k===tab?'aria-current="page"':''} data-tab="${k}">${n}</button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
+  $('#app').innerHTML = '<p class="muted">Loading…</p>';
+  try { $('#app').innerHTML = await TABS[tab](); } catch(e){ $('#app').innerHTML=''; alertBox(e); }
+}
+
+async function boot(){
+  syncAppearance();
+  if (!sb) return showLogin();
+  if (recovery) return showRecovery();
+  const { data:{ session } } = await sb.auth.getSession();
+  if (location.href.includes('#') || location.search) history.replaceState(null, '', location.pathname);
+  if (!session) return showLogin(urlError);
+  let { data:r } = await sb.rpc('my_role');
+  if (!r) { const { data:c } = await sb.rpc('claim_first_owner'); if (c === 'owner') r = 'owner'; }
+  role = r;
+  if (!role) { showLogin('Signed in, but this account is not an admin yet. Ask the owner to add you.'); return; }
+  document.body.classList.remove('signin'); $('#tabs').classList.remove('hidden');
+  render();
+}
+sb?.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') { recovery = true; showRecovery(); } if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') boot(); });
+$('#signout').onclick = async () => { await sb?.auth.signOut(); boot(); };
+boot();
+</script>
+</body>
+</html>
