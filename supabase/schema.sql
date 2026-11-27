@@ -266,3 +266,30 @@ create or replace view public.v_media_by_step with (security_invoker = true) as
 select module_id, step_id, kind, count(*) as items, count(distinct device_id) as lead_farmers, max(created_at) as latest
 from public.step_media where review <> 'hidden' group by 1,2,3;
 grant select on public.v_media_by_step to authenticated;
+
+-- ============ 1.3.0: team by email (same as migrations/20261127000000_team_by_email.sql) ============
+
+create or replace function public.admin_grant(p_email text, p_role text default 'editor') returns text
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid;
+begin
+  if public.my_role() is distinct from 'owner' then raise exception 'Only the owner can add team members' using errcode = '42501'; end if;
+  if p_role is null or p_role not in ('viewer','editor','owner') then raise exception 'Role must be viewer, editor or owner' using errcode = '22023'; end if;
+  select u.id into uid from auth.users u where lower(u.email) = lower(trim(p_email)) limit 1;
+  if uid is null then return 'no_account'; end if;
+  insert into public.admin_roles(user_id, role) values (uid, p_role)
+    on conflict (user_id) do update set role = excluded.role;
+  insert into public.admin_audit_log(action, detail) values ('admin_grant', jsonb_build_object('target', uid, 'role', p_role));
+  return p_role;
+end $$;
+
+create or replace function public.admin_team() returns table(email text, role text, since timestamptz)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Admins only' using errcode = '42501'; end if;
+  return query select u.email::text, r.role, r.created_at from public.admin_roles r join auth.users u on u.id = r.user_id order by r.created_at;
+end $$;
+
+revoke all on function public.admin_grant(text, text), public.admin_team() from public, anon;
+grant execute on function public.admin_grant(text, text), public.admin_team() to authenticated;
+notify pgrst, 'reload schema';
