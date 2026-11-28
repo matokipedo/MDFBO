@@ -1,316 +1,547 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="app-version" content="1.3.0">
+<title>MDF back office</title>
 <meta name="theme-color" content="#0f1512">
-<meta name="robots" content="noindex">
-<title>MDF Back Office</title>
+<meta name="color-scheme" content="dark light">
 <script>
-(function(){try{
-  var t=localStorage.getItem('mdfbo_theme')||'auto', w=localStorage.getItem('mdfbo_warm')==='1';
-  if(t!=='auto')document.documentElement.setAttribute('data-theme',t);
-  if(w)document.documentElement.setAttribute('data-warm','1');
-}catch(e){}})();
+/* Appearance: follows the system (Auto), or Light / Dark. Warm tint is an optional Night-Shift-style filter. Runs before paint to avoid a flash. */
+(function () {
+  var P = 'mdfbo_', r = document.documentElement, mq = matchMedia('(prefers-color-scheme: light)');
+  function get(k) { try { return localStorage.getItem(P + k); } catch (e) { return null; } }
+  function set(k, v) { try { localStorage.setItem(P + k, v); } catch (e) {} }
+  function resolved() { var t = get('theme'); return t === 'light' || t === 'dark' ? t : (mq.matches ? 'light' : 'dark'); }
+  function apply() {
+    var t = get('theme'); if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
+    if (get('warm') === 'on') r.setAttribute('data-warm', ''); else r.removeAttribute('data-warm');
+    var c = resolved() === 'light' ? '#f4f2ea' : '#0f1512', m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', c);
+    var lbl = { auto: 'Auto', light: 'Light', dark: 'Dark' };
+    document.querySelectorAll('[data-theme-btn]').forEach(function (b) { b.setAttribute('aria-label', 'Appearance: ' + lbl[t === 'light' || t === 'dark' ? t : 'auto'] + '. Activate to change.'); });
+    document.querySelectorAll('[data-warm-btn]').forEach(function (b) { b.setAttribute('aria-checked', get('warm') === 'on' ? 'true' : 'false'); });
+  }
+  apply();
+  mq.addEventListener && mq.addEventListener('change', apply);
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-theme-btn],[data-warm-btn]'); if (!b) return;
+    if (b.hasAttribute('data-theme-btn')) { var t = get('theme'); set('theme', t === 'light' ? 'dark' : t === 'dark' ? 'auto' : 'light'); }
+    else set('warm', get('warm') === 'on' ? 'off' : 'on');
+    apply();
+  });
+  document.addEventListener('DOMContentLoaded', function () { apply(); new MutationObserver(function () { apply(); }).observe(document.body, { childList: true, subtree: true }); });
+})();
 </script>
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="apple-touch-icon" href="assets/icon.svg">
+<script src="config.js?v=1.3.0"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <style>
-:root{--bg:#0f1512;--panel:#161f1a;--raised:#1e2a23;--line:#2b3a31;--text:#ecf2ea;--muted:#9fb0a2;--accent:#e8b923;--accent-ink:#e8b923;--on-accent:#1b1500;--ok:#5cc27a;--bad:#e2735c;--warn:#e0a83a;--r:14px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-:root[data-theme=light]{--bg:#f4f2ea;--panel:#fffdf7;--raised:#fff;--line:#e2dccb;--text:#1b261e;--muted:#5b675c;--accent-ink:#7a5c00;--ok:#2c8a4a;--bad:#b3452f;--warn:#8a5a00}
-@media (prefers-color-scheme: light){:root:not([data-theme=dark]){--bg:#f4f2ea;--panel:#fffdf7;--raised:#fff;--line:#e2dccb;--text:#1b261e;--muted:#5b675c;--accent-ink:#7a5c00;--ok:#2c8a4a;--bad:#b3452f;--warn:#8a5a00}}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--font)}
-html[data-warm="1"]::after{content:"";position:fixed;inset:0;background:#ff9a2e;opacity:.16;mix-blend-mode:multiply;pointer-events:none;z-index:999}
-.top{display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-.top b{font-size:17px}.top b span{color:var(--accent-ink)}.sp{flex:1}
-body.signin .top .pills{display:none}
-.pill{border:1px solid var(--line);background:var(--raised);color:var(--text);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
-.tabs{display:flex;gap:4px;padding:8px 18px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
-.tabs button{border:0;background:none;color:var(--muted);padding:8px 12px;border-radius:10px;font:inherit;cursor:pointer;white-space:nowrap}
-.tabs button[aria-current=page]{background:var(--raised);color:var(--text);font-weight:700}
-main{max-width:1100px;margin:0 auto;padding:18px}
-h1{font-size:22px;margin:4px 0 14px}h2{font-size:17px;margin:18px 0 8px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.kpi .v{font-size:30px;font-weight:800}.kpi .l{color:var(--muted);font-size:13px}.kpi .d{font-size:12px;color:var(--muted);margin-top:4px}
-.kpi.na .v{color:var(--muted)}
-table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
-.btn{border:1px solid var(--line);background:var(--raised);color:var(--text);border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
-.btn.acc{background:var(--accent);color:var(--on-accent);border-color:transparent}
-input,select,textarea{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--raised);color:var(--text);font:inherit}
-label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
-.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0 12px}
-.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:999px;background:var(--raised);border:1px solid var(--line)}
-.tag.sample{color:var(--accent-ink);border-style:dashed}
-.err{background:var(--raised);border:1px solid var(--bad);color:var(--text);padding:10px;border-radius:10px;margin:10px 0}
-.muted{color:var(--muted)}
-.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
-/* sign-in card */
-.login{max-width:400px;margin:40px auto;padding:22px}
-.login .prov{display:flex;align-items:center;gap:10px;width:100%;justify-content:center;margin:6px 0;padding:10px}
-.or{display:flex;align-items:center;gap:10px;color:var(--muted);margin:12px 0}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
-.status{margin-top:10px;font-size:14px}.status:empty{display:none}
-.hidden{display:none!important}
+/* MDF colours: field green + maize gold. Same token names everywhere so every tab looks the same. */
+:root{color-scheme:dark light;--bg:#0f1512;--panel:#161f1a;--card:#1e2a23;--line:#2b3a31;--text:#ecf2ea;--muted:#9fb0a2;--acc:#e8b923;--acc-text:#e8b923;--onacc:#1b1500;--ok:#5cc27a;--bad:#e2735c;--warn:#e0a83a;--bar:#5cc27a;--spark:#e8b923;--banner-bg:#2a2a14;--banner-fg:#f1d77a;--hover:rgba(255,255,255,.06);--sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+@media (prefers-color-scheme:light){:root:not([data-theme]){color-scheme:light;--bg:#f4f2ea;--panel:#ebe7da;--card:#fffdf7;--line:#dcd5c2;--text:#1b261e;--muted:#5b675c;--acc-text:#6f5300;--ok:#2c8a4a;--bad:#b3452f;--warn:#8a5a00;--bar:#2c8a4a;--spark:#2c8a4a;--banner-bg:#f6ecc4;--banner-fg:#5a4300;--hover:rgba(27,38,30,.07)}}
+:root[data-theme=light]{color-scheme:light;--bg:#f4f2ea;--panel:#ebe7da;--card:#fffdf7;--line:#dcd5c2;--text:#1b261e;--muted:#5b675c;--acc-text:#6f5300;--ok:#2c8a4a;--bad:#b3452f;--warn:#8a5a00;--bar:#2c8a4a;--spark:#2c8a4a;--banner-bg:#f6ecc4;--banner-fg:#5a4300;--hover:rgba(27,38,30,.07)}
+:root[data-theme=dark]{color-scheme:dark}
+@media (prefers-contrast:more){:root{--muted:#d4dcd5;--line:#5a6b5f}:root[data-theme=light]{--muted:#3a443b;--line:#8a917f}}
+.tbtn{display:inline-flex;align-items:center;gap:6px;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:99px;padding:6px 11px;font:600 12px/1 var(--sans);cursor:pointer}
+.tbtn:hover{border-color:var(--acc)}.tbtn .tl,.tbtn .td{display:none}
+html[data-theme=light] .tbtn .ta,html[data-theme=dark] .tbtn .ta{display:none}html[data-theme=light] .tbtn .tl{display:inline}html[data-theme=dark] .tbtn .td{display:inline}
+.tbtn[aria-checked=true]{background:#f2a65a;border-color:#f2a65a;color:#2a1a08}
+html[data-warm]::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2147483000;background:rgba(255,150,50,.16);mix-blend-mode:multiply}
+@media print{html[data-warm]::after{display:none}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+a{color:var(--acc-text)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+.hdr{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+.hdr img{height:30px;border-radius:7px}.hdr b{font-weight:900;letter-spacing:.05em;font-size:18px}.hdr .tag{color:var(--muted);font-size:12px;border:1px solid var(--line);border-radius:99px;padding:2px 10px}
+.hdr .sp{flex:1}.hdr small{color:var(--muted)}
+nav{display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{background:none;border:0;padding:10px 14px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+nav button[aria-selected=true]{color:var(--text);border-color:var(--acc);font-weight:600}
+nav .n{background:var(--acc);color:var(--onacc);border-radius:99px;font-size:11px;font-weight:700;padding:0 6px;margin-left:6px}
+main{max-width:1100px;margin:0 auto;padding:22px 20px 60px}
+h2{font-size:18px;margin:0 0 14px}h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.tw{padding:4px 8px;overflow-x:auto}
+/* Insight pages: window -> key metrics -> highlights -> sections -> ranked lists -> grey note */
+.ins .sec{margin:22px 0 8px;font-size:15px;font-weight:700}
+.ins .tiles{display:grid;gap:12px;grid-template-columns:repeat(3,1fr)}@media (max-width:640px){.ins .tiles{grid-template-columns:repeat(2,1fr)}}
+.ins .tiles.t4{grid-template-columns:repeat(4,1fr)}@media (max-width:640px){.ins .tiles.t4{grid-template-columns:repeat(2,1fr)}}
+.ins .kt{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 12px 8px;min-height:128px;display:flex;flex-direction:column}
+.ins .kt .l{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ins .kt b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;margin:2px 0 6px}
+.ins .kt svg{margin-top:auto;width:100%;height:46px;display:block}.ins .kt svg rect{fill:var(--spark)}
+.ins .kt.na b{color:var(--muted)}.ins .kt.na .d{font-size:12px;color:var(--muted);margin-top:auto}
+.ins button.kt{font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%}.ins button.kt:hover,.ins button.kt:focus-visible{border-color:var(--acc)}
+.ins .life{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:2px 10px;background:var(--banner-bg);color:var(--banner-fg)}
+.ins .ms{display:grid;gap:10px 28px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.ins .m{display:flex;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.ins .m i{flex:none;width:38px;height:38px;border-radius:8px;display:grid;place-items:center;font-style:normal;font-weight:800;background:var(--card);border:1px solid var(--line);color:var(--acc-text)}
+.ins .m small{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ins .tops{display:grid;gap:22px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.ins .rk{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.ins .rk .n{width:18px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ins .rk .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ins .rk .v{font-variant-numeric:tabular-nums;font-weight:700}
+.ins .none{color:var(--muted);font-size:13px;padding:8px 0}
+.chg{font-size:13px;font-weight:700;color:var(--muted)}.chg.up{color:var(--ok)}.chg.dn{color:var(--bad)}
+.hbar{display:grid;grid-template-columns:minmax(120px,210px) 1fr 52px;gap:8px;align-items:center;margin:6px 0}.hbar .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbar .b{height:8px;background:var(--card);border-radius:4px;overflow:hidden}.hbar .b i{display:block;height:100%;background:var(--bar)}.hbar .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.btn{background:var(--acc);color:var(--onacc);border:0;border-radius:8px;padding:8px 14px;font-weight:700;text-decoration:none;display:inline-block}
+.btn.sec{background:var(--card);color:var(--text);border:1px solid var(--line);font-weight:500}
+.btn.bad{background:none;border:1px solid var(--bad);color:var(--bad);font-weight:500}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:default}
+.f{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;outline:0}.f:focus{border-color:var(--acc)}
+label.l{display:block;color:var(--muted);font-size:12px;margin:10px 0 4px}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:0 12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row.sp{justify-content:space-between}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:12px}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;border-radius:99px;padding:1px 9px;font-size:11px;border:1px solid var(--line);color:var(--muted)}
+.pill.ok{color:var(--ok);border-color:var(--ok)}.pill.warn{color:var(--warn);border-color:var(--warn)}.pill.bad{color:var(--bad);border-color:var(--bad)}.pill.sample{color:var(--acc-text);border-style:dashed}
+.lk{background:none;border:0;color:var(--text);font:inherit;cursor:pointer;padding:0;text-align:left;text-decoration:underline dotted;text-underline-offset:3px}.lk:hover,.lk:focus-visible{color:var(--acc-text)}
+.muted{color:var(--muted)}.err{color:var(--bad)}.ok{color:var(--ok)}
+.sso{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}.sso .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;font-weight:600}.sso svg{flex:none}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:12px 0 4px}.or::before,.or::after{content:'';flex:1;height:1px;background:var(--line)}
+.idrow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}.idrow:last-child{border:0}.idrow b{flex:1}
+.login{max-width:380px;margin:10vh auto;padding:0 20px}.login .logo{text-align:center;margin-bottom:18px}.login .logo img{height:70px;border-radius:16px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+.mcard .mm{width:100%;height:150px;object-fit:cover;border-radius:8px;background:#000;display:block}
+.mcard .mm.none{display:grid;place-items:center;background:var(--card);color:var(--muted)}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:520px;width:calc(100% - 28px)}
+dialog::backdrop{background:rgba(0,0,0,.65)}
+@keyframes skel{0%{opacity:.45}50%{opacity:.9}100%{opacity:.45}}.skel{background:var(--card);border-radius:8px;animation:skel 1.3s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--text);color:var(--bg);border-radius:8px;padding:9px 14px;font-weight:600;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:90vw}#toast.show{opacity:1}
+.vfoot{text-align:center;color:var(--muted);font-size:12px;padding:24px 0 32px}
+[hidden]{display:none!important}
+@media (max-width:640px){.hbar{grid-template-columns:100px 1fr 44px}table{font-size:13px}.hdr small{display:none}}
 </style>
 </head>
-<body class="signin">
-<div class="top"><b>M<span>DF</span> · Back Office</b><span class="sp"></span>
-  <span class="pills"><button class="pill" data-theme-btn>Auto</button> <button class="pill" data-warm-btn role="switch" aria-checked="false">Warm</button> <button class="pill" id="signout">Sign out</button></span>
-</div>
-<nav class="tabs hidden" id="tabs"></nav>
-<main id="app"></main>
-
-<!-- Sign-in (standard back-office screen) -->
-<template id="tpl-login">
-<div class="card login" id="view-login">
-  <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px"><button class="pill" data-theme-btn>Auto</button><button class="pill" data-warm-btn role="switch" aria-checked="false">Warm</button></div>
-  <h1 style="text-align:center;margin-bottom:2px">Sign in</h1>
-  <p class="muted" style="text-align:center;margin-top:0">PROMAS Digital Farmer Learning &amp; Extension</p>
-  <button class="btn prov" data-prov="google">G&nbsp; Sign in with Google</button>
-  <button class="btn prov" data-prov="apple"> Sign in with Apple</button>
-  <button class="btn prov" data-prov="azure">⊞ Sign in with Microsoft</button>
-  <button class="btn prov" data-prov="custom:yahoo">Y! Sign in with Yahoo</button>
-  <button class="btn prov" id="passkey">🔑 Sign in with a passkey</button>
-  <div class="or">or</div>
-  <label for="em">Email</label><input id="em" type="email" autocomplete="username">
-  <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">
-  <div style="display:flex;gap:8px;margin-top:12px"><button class="btn acc" style="flex:1" id="signin">Sign in</button><button class="btn" style="flex:1" id="signup">Create account</button></div>
-  <div style="text-align:center;margin-top:8px"><button class="btn" style="border:0;background:none" id="forgot">Forgot password?</button></div>
-  <div class="status" id="status"></div>
-  <p class="muted" style="font-size:13px">First time? Sign in with email and password once, then link Google, Apple, Microsoft, Yahoo or a passkey under Settings → Sign-in methods. The first account that signs in becomes the admin.</p>
-</div>
-</template>
-
-<script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm';
-const APP_VERSION = '1.2.0';
-const SUPABASE_URL = 'https://osbwuklsslvuaqhbezzc.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_UHvM6rIuT7ejO0DPNBmM-g_3A34DJdY';
-const MODULES = { m1:'1 Preparing for planting', m2:'2 Planting correctly', m3:'3 Early crop management', m4:'4 Crop protection', m5:'5 Harvesting & marketing' };
-
-// Read recovery / errors from the URL before creating the client
-const urlBits = new URLSearchParams(location.hash.slice(1) + '&' + location.search.slice(1));
-let recovery = urlBits.get('type') === 'recovery';
-const urlError = urlBits.get('error_description');
-const configured = !SUPABASE_URL.startsWith('__');
-const sb = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{ storageKey:'mdfbo_auth', persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } }) : null;
-
-const $ = s => document.querySelector(s);
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="dlg"><form method="dialog" id="dlgf"><h2 id="dlgt" style="margin-bottom:6px"></h2><p class="muted" id="dlgh" style="margin:0 0 8px"></p><textarea class="f" id="dlgx" rows="5" maxlength="2000"></textarea><div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn sec" value="cancel" type="submit" formnovalidate>Cancel</button><button class="btn" value="ok" type="submit" id="dlgok">Save</button></div></form></dialog>
+<script>
+(() => {
+'use strict';
+const cfg = window.MDFBO_CONFIG || {};
+const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let tab = 'overview', role = null;
-
-/* ---------- Appearance ---------- */
-function syncAppearance(){
-  const th = localStorage.getItem('mdfbo_theme') || 'auto', w = localStorage.getItem('mdfbo_warm') === '1';
-  document.querySelectorAll('[data-theme-btn]').forEach(b => b.textContent = th==='auto'?'Auto':th==='dark'?'Dark':'Light');
-  document.querySelectorAll('[data-warm-btn]').forEach(b => b.setAttribute('aria-checked', String(w)));
-  const dark = th==='dark' || (th==='auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.querySelector('meta[name=theme-color]').content = dark ? '#0f1512' : '#f4f2ea';
-}
-document.addEventListener('click', e => {
-  if (e.target.closest('[data-theme-btn]')) { const o=['dark','light','auto'], c=localStorage.getItem('mdfbo_theme')||'auto', n=o[(o.indexOf(c)+1)%3]; localStorage.setItem('mdfbo_theme', n); n==='auto'?document.documentElement.removeAttribute('data-theme'):document.documentElement.setAttribute('data-theme', n); syncAppearance(); }
-  if (e.target.closest('[data-warm-btn]')) { const w=localStorage.getItem('mdfbo_warm')!=='1'; localStorage.setItem('mdfbo_warm', w?'1':'0'); w?document.documentElement.setAttribute('data-warm','1'):document.documentElement.removeAttribute('data-warm'); syncAppearance(); }
-});
-
-/* ---------- Auth ---------- */
+const nf = n => Number(n || 0).toLocaleString();
+const pct = (a, b) => b ? Math.round(100 * a / b) : null;
+const fmtDate = iso => iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const ago = iso => { if (!iso) return 'never'; const s = (Date.now() - new Date(iso)) / 1000; if (s < 90) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 172800) return Math.floor(s / 3600) + ' h ago'; return Math.floor(s / 86400) + ' d ago'; };
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500); }
 const plain = m => {
-  m = String(m||'');
+  m = String(m || '');
   if (/provider is not enabled|Unsupported provider/i.test(m)) return "This sign-in option isn't switched on in Supabase yet; SIGNIN.md has the steps.";
-  if (/Signups not allowed/i.test(m)) return 'New sign-ups are switched off. Ask the admin to add you.';
+  if (/Signups not allowed/i.test(m)) return 'New sign-ups are switched off. Ask the owner to add you.';
   if (/Manual linking is disabled/i.test(m)) return 'Turn on "Allow manual linking" in Supabase → Authentication → Sign In / Providers.';
   if (/NotAllowedError|AbortError/i.test(m)) return 'The passkey prompt was closed. Nothing changed.';
+  if (/JWT expired|invalid JWT/i.test(m)) return 'Your sign-in expired. Sign out and sign in again.';
   return m;
 };
-function setStatus(m){ const s=$('#status'); if(s) s.textContent = m || ''; }
-function showLogin(msg){
-  document.body.classList.add('signin'); $('#tabs').classList.add('hidden');
-  $('#app').innerHTML = $('#tpl-login').innerHTML; syncAppearance();
-  if (!configured) setStatus('Not connected yet: put the Supabase URL and anon key in index.html (SETUP.md step 2).');
-  if (msg) setStatus(msg);
-  document.querySelectorAll('[data-prov]').forEach(b => b.onclick = () => oauth(b.dataset.prov));
-  $('#passkey').onclick = async () => { try { const { error } = await sb.auth.signInWithPasskey?.() ?? { error:{ message:'Passkeys need supabase-js 2.118+ and Supabase passkeys switched on.' } }; if (error) setStatus(plain(error.message)); } catch(e){ setStatus(plain(e.name||e.message)); } };
-  $('#signin').onclick = async () => { if(!sb) return; const { error } = await sb.auth.signInWithPassword({ email:$('#em').value.trim(), password:$('#pw').value }); if (error) setStatus(plain(error.message)); };
-  $('#signup').onclick = async () => { if(!sb) return; const { error } = await sb.auth.signUp({ email:$('#em').value.trim(), password:$('#pw').value, options:{ emailRedirectTo: location.origin+location.pathname } }); setStatus(error ? plain(error.message) : 'Check your email to confirm, then sign in.'); };
-  $('#forgot').onclick = async () => { const em=$('#em').value.trim(); if(!em) return setStatus('Type your email first, then tap Forgot password.'); const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin+location.pathname }); setStatus(error ? plain(error.message) : 'Reset link sent. Check your email.'); };
+const msg = e => plain((e && (e.message || e.error_description)) || String(e || 'Something went wrong'));
+const app = $('#app');
+
+const MODULES = { m1: '1 Preparing for planting', m2: '2 Planting correctly', m3: '3 Early crop management', m4: '4 Crop protection', m5: '5 Harvesting & marketing' };
+const STEPS = { introduce: '1 Introduce', explain: '2 Explain', demonstrate: '3 Demonstrate', practice: '4 Practice', check: '5 Check', reinforce: '6 Reinforce', plot: 'Demo plot' };
+
+if (!cfg.supabaseUrl || !cfg.supabaseKey) {
+  app.innerHTML = `<div class="login"><div class="card"><h2>Not connected yet</h2><p class="muted">Open <code>config.js</code> and paste the Supabase project URL and the <b>publishable (anon)</b> key. Never paste the service_role key here.</p></div><footer class="vfoot">MDF back office v${(document.querySelector('meta[name=app-version]') || {}).content || ''}</footer></div>`;
+  return;
 }
-async function oauth(provider){
-  if(!sb) return;
-  const { data, error } = await sb.auth.signInWithOAuth({ provider, options:{ redirectTo: location.origin+location.pathname, skipBrowserRedirect:true } });
-  if (error) return setStatus(plain(error.message));
-  try { const r = await fetch(data.url, { redirect:'manual' }); if (r.status >= 400 && r.status < 500) { const j = await r.json().catch(()=>({})); return setStatus(plain(j.msg || j.error_description || 'provider is not enabled')); } } catch(e){}
-  location.assign(data.url);
+let sb;
+const S = { user: null, role: null, tab: 'overview', days: null, sessions: [], feedback: [], plots: [], farmers: [], dealers: [], media: [], last: {}, mf: { plot: '', module: '', review: '' } };
+const canEdit = () => S.role === 'editor' || S.role === 'owner';
+const sampleTag = r => r && r.is_sample ? ' <span class="pill sample">sample</span>' : '';
+
+/* ---------- boot ---------- */
+async function boot() {
+  if (!window.supabase) await new Promise(r => { const t = setInterval(() => { if (window.supabase) { clearInterval(t); r(); } }, 50); setTimeout(() => { clearInterval(t); r(); }, 6000); });
+  if (!window.supabase) { app.innerHTML = `<div class="login"><div class="card err">Could not load the Supabase library. Check your connection and reload.</div><footer class="vfoot">MDF back office v${esc(version())}</footer></div>`; return; }
+  sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { storageKey: 'mdfbo_auth', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, experimental: { passkey: cfg.passkeys !== false } } });
+  const hp = new URLSearchParams(location.hash.slice(1) + '&' + location.search.slice(1)); S.recovery = hp.get('type') === 'recovery'; if (hp.get('error_description')) S.note = 'Sign-in failed: ' + hp.get('error_description').replace(/\+/g, ' ');
+  const { data } = await sb.auth.getSession();
+  S.user = data.session ? data.session.user : null;
+  if (hp.get('access_token') || hp.get('error_description') || hp.get('code')) history.replaceState(null, '', location.pathname);
+  sb.auth.onAuthStateChange((e, s) => { const u = s ? s.user : null; if (e === 'PASSWORD_RECOVERY') { S.recovery = true; S.user = u; renderSetPassword(); return; } if (S.recovery) return; if ((u && u.id) !== (S.user && S.user.id)) { S.user = u; start(); } });
+  start();
 }
-function showRecovery(){
-  document.body.classList.add('signin');
-  $('#app').innerHTML = `<div class="card login"><h1>Choose a new password</h1><label>New password</label><input id="np1" type="password"><label>Again</label><input id="np2" type="password"><button class="btn acc" style="width:100%;margin-top:12px" id="npgo">Save</button><div class="status" id="status"></div></div>`;
-  $('#npgo').onclick = async () => { if ($('#np1').value !== $('#np2').value) return setStatus("The two passwords don't match."); const { error } = await sb.auth.updateUser({ password:$('#np1').value }); if (error) return setStatus(plain(error.message)); recovery=false; boot(); };
+async function start() {
+  if (S.recovery && S.user) return renderSetPassword();
+  if (!S.user) { const n = S.note; S.note = ''; return renderLogin(n); }
+  const { data, error } = await sb.rpc('my_role');
+  S.role = !error && data ? data : null;
+  if (!S.role) return renderNoAccess(error);
+  renderShell(); app.querySelector('#main').innerHTML = '<div class="skel" style="height:120px"></div><div class="skel" style="height:220px;margin-top:14px"></div>';
+  await loadAll(); renderTab();
 }
 
-/* ---------- Data helpers (1,000-row pages) ---------- */
-async function all(table, select='*', order='created_at'){
-  const out=[]; for (let from=0;;from+=1000){ const { data, error } = await sb.from(table).select(select).order(order,{ascending:false}).range(from, from+999); if (error) throw error; out.push(...data); if (data.length < 1000) break; } return out;
+/* ---------- login / claim ---------- */
+const PROVIDERS = [
+  ['google', 'Google', '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.5-5.8c-2.1 1.4-4.8 2.3-8 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>'],
+  ['apple', 'Apple', '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.63c-.03-2.7 2.2-4 2.3-4.06-1.25-1.83-3.2-2.08-3.9-2.11-1.66-.17-3.24.98-4.08.98-.85 0-2.14-.96-3.52-.93-1.81.03-3.48 1.05-4.41 2.67-1.88 3.26-.48 8.1 1.35 10.74.9 1.3 1.96 2.75 3.36 2.7 1.35-.05 1.86-.87 3.5-.87 1.63 0 2.09.87 3.52.84 1.45-.03 2.37-1.32 3.26-2.62 1.03-1.5 1.45-2.95 1.48-3.02-.03-.01-2.84-1.09-2.87-4.3zM13.7 4.6c.74-.9 1.24-2.15 1.1-3.4-1.07.04-2.37.71-3.14 1.61-.69.8-1.29 2.07-1.13 3.29 1.2.09 2.42-.61 3.17-1.5z"/></svg>'],
+  ['azure', 'Microsoft', '<svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true"><path fill="#F25022" d="M1 1h10v10H1z"/><path fill="#7FBA00" d="M12 1h10v10H12z"/><path fill="#00A4EF" d="M1 12h10v10H1z"/><path fill="#FFB900" d="M12 12h10v10H12z"/></svg>'],
+  ['custom:yahoo', 'Yahoo', '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#6001D2"/><path fill="#fff" d="M6 7h3.2l2 5 2-5H16l-4.2 9.3V20H9.600v-3.700z" transform="translate(0 -1)"/></svg>']
+];
+const provName = id => (PROVIDERS.find(p => p[0] === id) || [id, id])[1];
+const THEME_BTNS = `<button class="tbtn" data-theme-btn type="button" title="Appearance: Auto / Light / Dark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><span class="ta">Auto</span><span class="tl">Light</span><span class="td">Dark</span></button><button class="tbtn" data-warm-btn type="button" role="switch" aria-checked="false" title="Warm night tint: softens blue light, like Night Shift"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><span>Warm</span></button>`;
+const authRedirect = () => location.origin + location.pathname;
+async function oauthGo(provider, link) {
+  try {
+    const opts = { redirectTo: authRedirect(), skipBrowserRedirect: true };
+    const { data, error } = link ? await sb.auth.linkIdentity({ provider, options: opts }) : await sb.auth.signInWithOAuth({ provider, options: opts });
+    if (error) return msg(error);
+    const url = data && data.url; if (!url) return 'No sign-in address came back.';
+    try { const r = await fetch(url, { redirect: 'manual' }); if (r.status >= 400 && r.status < 500) { const j = await r.json().catch(() => ({})); return plain(j.msg || j.error_description || 'provider is not enabled'); } } catch (e) { /* cross-origin redirect is expected */ }
+    location.assign(url); return '';
+  } catch (e) { return msg(e); }
 }
-const csvCell = v => { let s = v==null?'':(typeof v==='object'?JSON.stringify(v):String(v)); if (/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s.replace(/"/g,'""')+'"'; };
-function downloadCSV(name, rows){ if(!rows.length) return; const cols=Object.keys(rows[0]); const csv=[cols.join(','), ...rows.map(r=>cols.map(c=>csvCell(r[c])).join(','))].join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=`mdf_${name}_${new Date().toISOString().slice(0,10)}.csv`; a.click(); }
-const canEdit = () => role==='editor' || role==='owner';
-const sampleTag = r => r.is_sample ? ' <span class="tag sample">sample</span>' : '';
-
-/* ---------- Tabs ---------- */
-const TABS = {
-  async overview(){
-    const [{ data:k, error }, sessions] = await Promise.all([ sb.from('v_indicators').select('*').single(), all('training_sessions','module_id,farmers_present,could_demonstrate,district,created_at') ]);
-    if (error) throw error;
-    const byMod = {}; sessions.forEach(s => { const m = byMod[s.module_id] ||= { n:0, f:0, c:0 }; m.n++; m.f+=s.farmers_present; m.c+=s.could_demonstrate; });
-    const kpi = (v,l,d,na) => `<div class="card kpi ${na?'na':''}"><div class="v">${v ?? '—'}</div><div class="l">${l}</div><div class="d">${d}</div></div>`;
-    return `<h1>Overview</h1>
-    <div class="kpis">
-      ${kpi(k.reach_farmers,'Reach: farmers trained', `${k.reach_women} women`)}
-      ${kpi(k.active_lead_farmers_30d,'Engagement: active lead farmers (30 days)', `of ${k.lead_farmers_total} registered`)}
-      ${kpi(k.quality_pct_full_sequence==null?null:k.quality_pct_full_sequence+'%','Quality: sessions with all 6 steps','Introduce → Reinforce')}
-      ${kpi(k.learning_pct_demonstrate==null?null:k.learning_pct_demonstrate+'%','Learning: could demonstrate','the key indicator')}
-      ${kpi(null,'Adoption','needs a follow-up farm visit survey (KoboToolbox/ODK)',true)}
-      ${kpi(null,'Productivity','yield: demo plots vs comparison farms',true)}
-      ${kpi(null,'Efficiency','cost per farmer reached: add a costs sheet',true)}
-      ${kpi(null,'Sustainability','% agrodealers still funding it after PROMAS',true)}
-    </div>
-    <h2>Learning by module</h2>
-    <div class="card"><table><tr><th>Module</th><th>Sessions</th><th>Farmers</th><th>Could demonstrate</th></tr>
-      ${Object.keys(MODULES).map(id=>{ const m=byMod[id]||{n:0,f:0,c:0}; const p=m.f?Math.round(100*m.c/m.f):0; return `<tr><td>${MODULES[id]}</td><td>${m.n}</td><td>${m.f}</td><td><div class="bar"><i style="width:${p}%"></i></div> ${m.f?p+'%':'—'}</td></tr>`; }).join('')}
-    </table></div>
-    <h2>Pipeline health</h2>
-    <div class="card"><table><tr><th>Table</th><th>Rows</th><th>Latest</th></tr>
-      ${await healthRows()}</table></div>`;
-  },
-  async sessions(){
-    const rows = await all('training_sessions');
-    window._export = () => downloadCSV('sessions', rows);
-    return `<h1>Training sessions <button class="btn" onclick="_export()">Export CSV</button></h1><div class="card"><table>
-      <tr><th>When</th><th>Lead farmer</th><th>Village / district</th><th>Module</th><th>Steps</th><th>Present (women)</th><th>Could demonstrate</th></tr>
-      ${rows.map(r=>`<tr><td>${esc(r.created_at.slice(0,16).replace('T',' '))}</td><td>${esc(r.lead_farmer||'—')}${sampleTag(r)}</td><td>${esc(r.village||'')} ${esc(r.district||'')}</td><td>${esc(MODULES[r.module_id]||r.module_id)}</td><td>${r.steps_completed}/6</td><td>${r.farmers_present} (${r.women_present})</td><td>${r.could_demonstrate}</td></tr>`).join('') || '<tr><td colspan=7 class="muted">No sessions yet. They arrive when lead farmers finish a lesson and have signal.</td></tr>'}
-    </table></div>`;
-  },
-  async plots(){
-    const [plots, lfs] = await Promise.all([ all('demo_plots'), all('lead_farmers','id,name,village') ]);
-    const lfName = id => (lfs.find(l=>l.id===id)||{}).name || '—';
-    window._export = () => downloadCSV('demo_plots', plots);
-    window._addPlot = async () => {
-      const v = id => $('#'+id).value.trim() || null;
-      const { error } = await sb.from('demo_plots').insert({ lead_farmer_id:v('p_lf'), crop:v('p_crop'), variety:v('p_var'), planting_date:v('p_date'), lat:v('p_lat')&&+v('p_lat'), lon:v('p_lon')&&+v('p_lon'), status:v('p_status') });
-      if (error) return alertBox(error); render();
-    };
-    window._gps = () => navigator.geolocation?.getCurrentPosition(p => { $('#p_lat').value = p.coords.latitude.toFixed(5); $('#p_lon').value = p.coords.longitude.toFixed(5); });
-    return `<h1>Demonstration plots <button class="btn" onclick="_export()">Export CSV</button></h1>
-    ${canEdit()?`<div class="card"><b>Add a plot</b><div class="form">
-      <div><label>Lead farmer</label><select id="p_lf"><option value="">—</option>${lfs.map(l=>`<option value="${l.id}">${esc(l.name)} · ${esc(l.village||'')}</option>`).join('')}</select></div>
-      <div><label>Crop</label><select id="p_crop"><option>maize</option><option>groundnut</option><option>sesame</option><option>pigeonpea</option></select></div>
-      <div><label>Variety</label><input id="p_var"></div>
-      <div><label>Planting date</label><input id="p_date" type="date"></div>
-      <div><label>Latitude</label><input id="p_lat" inputmode="decimal"></div>
-      <div><label>Longitude <a href="#" onclick="_gps();return false">use my GPS</a></label><input id="p_lon" inputmode="decimal"></div>
-      <div><label>Status</label><select id="p_status"><option>planned</option><option>established</option><option>harvested</option><option>abandoned</option></select></div>
-    </div><button class="btn acc" style="margin-top:12px" onclick="_addPlot()">Save plot</button></div><br>`:''}
-    <div class="card"><table><tr><th>Lead farmer</th><th>Crop / variety</th><th>Planted</th><th>Week</th><th>Status</th><th>Map</th><th>Yield kg/ha</th></tr>
-      ${plots.map(p=>{ const wk = p.planting_date ? Math.floor((Date.now()-new Date(p.planting_date))/604800000) : null;
-        return `<tr><td>${esc(lfName(p.lead_farmer_id))}${sampleTag(p)}</td><td>${esc(p.crop)} ${esc(p.variety||'')}</td><td>${esc(p.planting_date||'—')}</td><td>${wk??'—'}</td><td><span class="tag">${esc(p.status)}</span></td><td>${p.lat!=null?`<a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=15/${p.lat}/${p.lon}">OSM</a>`:'—'}</td><td>${p.final_yield_kg_ha??'—'}</td></tr>`; }).join('') || '<tr><td colspan=7 class="muted">No plots yet.</td></tr>'}
-    </table></div>
-    <p class="muted">Photos and stage-by-stage observations: technicians collect them offline with a KoboToolbox form (see SETUP.md step 6) and import them into plot observations.</p>`;
-  },
-  async questions(){
-    const rows = await all('feedback');
-    window._answer = async id => { const a = prompt('Answer (it is saved here; send it back to the lead farmer on WhatsApp):'); if(!a) return; const { error } = await sb.from('feedback').update({ answer:a, status:'answered', answered_at:new Date().toISOString() }).eq('id', id); if (error) return alertBox(error); render(); };
-    window._escalate = async id => { const { error } = await sb.from('feedback').update({ status:'escalated' }).eq('id', id); if (error) return alertBox(error); render(); };
-    return `<h1>Questions from lead farmers</h1><div class="card"><table><tr><th>When</th><th>Where</th><th>Question</th><th>Status</th><th></th></tr>
-      ${rows.map(r=>`<tr><td>${esc(r.created_at.slice(0,10))}</td><td>${esc(r.village||'')} ${esc(r.district||'')}</td><td>${esc(r.message)}${r.answer?`<div class="muted">↳ ${esc(r.answer)}</div>`:''}${sampleTag(r)}</td><td><span class="tag">${esc(r.status)}</span></td><td>${canEdit()&&r.status!=='answered'?`<button class="btn" onclick="_answer(${r.id})">Answer</button> <button class="btn" onclick="_escalate(${r.id})">To content team</button>`:''}</td></tr>`).join('') || '<tr><td colspan=5 class="muted">No questions yet.</td></tr>'}
-    </table></div>`;
-  },
-  async people(){
-    const [dealers, techs, lfs] = await Promise.all([ all('agrodealers'), all('technicians'), all('lead_farmers') ]);
-    const dName = id => (dealers.find(d=>d.id===id)||{}).name || '—';
-    window._addLF = async () => { const v=id=>$('#'+id).value.trim()||null; const { error } = await sb.from('lead_farmers').insert({ name:v('l_name'), sex:v('l_sex'), village:v('l_village'), district:v('l_district'), phone:v('l_phone'), agrodealer_id:v('l_dealer') }); if (error) return alertBox(error); render(); };
-    window._addDealer = async () => { const v=id=>$('#'+id).value.trim()||null; const { error } = await sb.from('agrodealers').insert({ name:v('d_name'), district:v('d_district'), partnership_season:+v('d_season')||1 }); if (error) return alertBox(error); render(); };
-    const season = s => s===1?'New':s===2?'2nd season':'3rd+ (graduating)';
-    return `<h1>Partners &amp; people</h1>
-    <h2>Agrodealers</h2><div class="card"><table><tr><th>Name</th><th>District</th><th>Partnership</th><th>Digital support level</th></tr>
-      ${dealers.map(d=>`<tr><td>${esc(d.name)}${sampleTag(d)}</td><td>${esc(d.district||'')}</td><td>${season(d.partnership_season)}</td><td class="muted">${d.partnership_season===1?'Kits, plot instructions, calendar':d.partnership_season===2?'+ monitoring, regular audio/video, feedback':'Runs content, calendar and monitoring with less PROMAS support'}</td></tr>`).join('')}
-    </table>${canEdit()?`<div class="form"><div><label>Name</label><input id="d_name"></div><div><label>District</label><input id="d_district"></div><div><label>Season</label><select id="d_season"><option>1</option><option>2</option><option>3</option></select></div></div><button class="btn" style="margin-top:10px" onclick="_addDealer()">Add agrodealer</button>`:''}</div>
-    <h2>Lead farmers (${lfs.length})</h2><div class="card"><table><tr><th>Name</th><th>Sex</th><th>Village / district</th><th>Agrodealer</th><th>Phone</th></tr>
-      ${lfs.map(l=>`<tr><td>${esc(l.name)}${sampleTag(l)}</td><td>${esc(l.sex||'')}</td><td>${esc(l.village||'')} ${esc(l.district||'')}</td><td>${esc(dName(l.agrodealer_id))}</td><td>${l.phone?`<a href="https://wa.me/${esc(l.phone.replace(/\D/g,''))}" target="_blank" rel="noopener">${esc(l.phone)}</a>`:''}</td></tr>`).join('')}
-    </table>${canEdit()?`<div class="form"><div><label>Name</label><input id="l_name"></div><div><label>Sex</label><select id="l_sex"><option value="">—</option><option value="f">F</option><option value="m">M</option></select></div><div><label>Village</label><input id="l_village"></div><div><label>District</label><input id="l_district"></div><div><label>Phone</label><input id="l_phone"></div><div><label>Agrodealer</label><select id="l_dealer"><option value="">—</option>${dealers.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></div></div><button class="btn" style="margin-top:10px" onclick="_addLF()">Add lead farmer</button>`:''}</div>`;
-  },
-  async media(){
-    const rows = await all('step_media');
-    const f = window._mf ||= { plot:'', module:'', review:'' };
-    const plots = [...new Set(rows.map(r=>r.plot_code||'—'))].sort();
-    const shown = rows.filter(r => (!f.plot || (r.plot_code||'—')===f.plot) && (!f.module || (r.module_id||'plot')===f.module) && (!f.review || r.review===f.review));
-    const paths = shown.slice(0, 200).map(r=>r.storage_path);
-    const urls = {};
-    if (paths.length) { const { data, error } = await sb.storage.from('step-media').createSignedUrls(paths, 3600); if (error) throw error; (data||[]).forEach(d => { if (d.signedUrl) urls[d.path] = d.signedUrl; }); }
-    window._mfSet = (k, v) => { f[k] = v; render(); };
-    window._review = async (id, review) => { const note = review==='needs_help' ? prompt('What should the lead farmer fix? (saved here; send it on WhatsApp)') : null; const { error } = await sb.from('step_media').update({ review, reviewer_note: note }).eq('id', id); if (error) return alertBox(error); render(); };
-    const STEP = { introduce:'1 Introduce', explain:'2 Explain', demonstrate:'3 Demonstrate', practice:'4 Practice', check:'5 Check', reinforce:'6 Reinforce', plot:'Demo plot' };
-    const groups = {};
-    shown.forEach(r => { const g = `${r.plot_code||'No plot code'} · ${MODULES[r.module_id]||'Demo plot'} · ${STEP[r.step_id]||r.step_id}`; (groups[g] ||= []).push(r); });
-    const card = r => { const u = urls[r.storage_path];
-      const media = !u ? '<div class="muted" style="height:150px;display:grid;place-items:center">not loaded</div>'
-        : r.kind==='video' ? `<video controls preload="metadata" src="${esc(u)}" style="width:100%;height:150px;object-fit:cover;border-radius:10px;background:#000"></video>`
-        : `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" loading="lazy" style="width:100%;height:150px;object-fit:cover;border-radius:10px"></a>`;
-      return `<div class="card" style="padding:8px">${media}<div style="font-size:13px;margin-top:6px"><b>${esc(r.lead_farmer||'—')}</b> · ${esc(r.village||'')}${sampleTag(r)}<br><span class="muted">${esc((r.taken_at||r.created_at).slice(0,16).replace('T',' '))} · ${Math.round(r.bytes/1024)} KB</span> <span class="tag">${esc(r.review)}</span>${r.reviewer_note?`<div class="muted">↳ ${esc(r.reviewer_note)}</div>`:''}</div>
-        ${canEdit()?`<div style="display:flex;gap:4px;margin-top:6px"><button class="btn" style="padding:4px 8px" onclick="_review(${r.id},'good')">✓ Good</button><button class="btn" style="padding:4px 8px" onclick="_review(${r.id},'needs_help')">Needs help</button><button class="btn" style="padding:4px 8px" onclick="_review(${r.id},'hidden')">Hide</button></div>`:''}</div>`; };
-    return `<h1>Photos &amp; videos from the field</h1>
-    <div class="form" style="margin-bottom:12px">
-      <div><label>Demo plot</label><select onchange="_mfSet('plot',this.value)"><option value="">All plots</option>${plots.map(p=>`<option ${p===f.plot?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
-      <div><label>Module</label><select onchange="_mfSet('module',this.value)"><option value="">All</option>${Object.entries(MODULES).map(([k,v])=>`<option value="${k}" ${k===f.module?'selected':''}>${v}</option>`).join('')}<option value="plot" ${f.module==='plot'?'selected':''}>Demo plot</option></select></div>
-      <div><label>Review</label><select onchange="_mfSet('review',this.value)"><option value="">All</option>${['new','good','needs_help','hidden'].map(v=>`<option ${v===f.review?'selected':''}>${v}</option>`).join('')}</select></div>
-    </div>
-    <p class="muted">${shown.length} of ${rows.length} items${shown.length>200?' (first 200 shown)':''}. Links expire after 1 hour; reopen the tab to refresh.</p>
-    ${Object.entries(groups).map(([g, items]) => `<h2>${esc(g)} <span class="muted">(${items.length})</span></h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">${items.map(card).join('')}</div>`).join('') || '<div class="card muted">No photos or videos yet. They arrive when lead farmers add them in a lesson and have signal.</div>'}`;
-  },
-  async settings(){
-    const { data:{ user } } = await sb.auth.getUser();
-    const ids = (user.identities||[]).map(i=>i.provider);
-    window._link = async p => { const { data, error } = await sb.auth.linkIdentity({ provider:p, options:{ redirectTo:location.origin+location.pathname, skipBrowserRedirect:true } }); if (error) return alert(plain(error.message)); location.assign(data.url); };
-    window._unlink = async p => { const idn = user.identities.find(i=>i.provider===p); const { error } = await sb.auth.unlinkIdentity(idn); if (error) return alert(plain(error.message)); render(); };
-    window._pw = async () => { if ($('#s1').value !== $('#s2').value) return alert("The two passwords don't match."); const { error } = await sb.auth.updateUser({ password:$('#s1').value }); alert(error ? plain(error.message) : 'Password changed.'); };
-    const provs = [['google','Google'],['apple','Apple'],['azure','Microsoft'],['custom:yahoo','Yahoo']];
-    return `<h1>Settings</h1>
-    <div class="card"><h2 style="margin-top:0">Sign-in methods</h2><table><tr><td>Email</td><td>${esc(user.email)}</td><td></td></tr>
-      ${provs.map(([p,n])=>`<tr><td>${n}</td><td>${ids.includes(p)?'Linked':'—'}</td><td>${ids.includes(p)?`<button class="btn" ${ids.length<2?'disabled':''} onclick="_unlink('${p}')">Unlink</button>`:`<button class="btn" onclick="_link('${p}')">Link</button>`}</td></tr>`).join('')}</table></div><br>
-    <div class="card"><h2 style="margin-top:0">Change password</h2><div class="form"><div><label>New password</label><input id="s1" type="password"></div><div><label>Again</label><input id="s2" type="password"></div></div><button class="btn acc" style="margin-top:10px" onclick="_pw()">Save password</button></div><br>
-    <div class="card"><h2 style="margin-top:0">Appearance</h2><p class="muted">Theme cycles Dark → Light → Auto (Auto follows your device). Warm adds an amber layer for night work. Both are saved in this browser.</p>
-      <p>Your role: <b>${esc(role)}</b> · Back office v${APP_VERSION}</p></div>`;
-  }
-};
-async function healthRows(){
-  const tables = [['training_sessions','Training sessions'],['feedback','Questions'],['demo_events','Kit events'],['demo_plots','Demo plots'],['step_media','Photos & videos'],['lead_farmers','Lead farmers']];
-  const res = await Promise.all(tables.map(async ([t,l]) => { const { count } = await sb.from(t).select('*',{count:'exact',head:true}); const { data } = await sb.from(t).select('created_at').order('created_at',{ascending:false}).limit(1); return `<tr><td>${l}</td><td>${count??0}</td><td>${data?.[0]?.created_at?.slice(0,16).replace('T',' ')||'—'}</td></tr>`; }));
-  return res.join('');
+async function passkeySignIn() { try { const { error } = await sb.auth.signInWithPasskey(); return error ? msg(error) : ''; } catch (e) { return plain(e.name || e.message); } }
+const loginFoot = () => `<footer class="vfoot">MDF back office v${esc(version())} · PROMAS Digital Farmer Learning &amp; Extension</footer>`;
+const logo = (title, sub) => `<div class="logo"><img src="assets/icon.svg" alt=""><h2 style="margin:8px 0 0">${title}</h2><div class="muted">${sub}</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center">${THEME_BTNS}</div></div>`;
+function renderLogin(note) {
+  app.innerHTML = `<div class="login">${logo('MDF back office', 'Digital Farmer Learning &amp; Extension. Team only.')}
+  <form class="card" id="lf"><div class="sso">${PROVIDERS.map(p => `<button class="btn sec" type="button" data-sso="${p[0]}">${p[2]}Sign in with ${p[1]}</button>`).join('')}${cfg.passkeys !== false && window.PublicKeyCredential ? '<button class="btn sec" type="button" id="pk">\u{1F511} Sign in with a passkey</button>' : ''}</div><div class="or">or</div>
+  <label class="l" for="em">Email</label><input class="f" id="em" type="email" autocomplete="username" required>
+  <label class="l" for="pw">Password</label><input class="f" id="pw" type="password" autocomplete="current-password" minlength="8" required>
+  <div class="row" style="margin-top:14px"><button class="btn" id="si" type="submit">Sign in</button><button class="btn sec" id="su" type="button">Create account</button><button class="btn sec" id="fp" type="button">Forgot password?</button></div>
+  <p class="${note && note.startsWith('Sign-in failed') ? 'err' : 'muted'}" id="ln" style="margin:12px 0 0;min-height:1.4em">${esc(note || '')}</p>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">First time? Sign in with email and password once, then link Google, Apple, Microsoft, Yahoo or a passkey under Settings → Sign-in methods. New accounts must be added to the team by the owner before they can see anything.</p></form>${loginFoot()}</div>`;
+  const say = (t, ok) => { $('#ln').className = ok ? 'ok' : 'err'; $('#ln').textContent = t; };
+  document.querySelectorAll('[data-sso]').forEach(b => b.onclick = async () => { b.disabled = true; const m = await oauthGo(b.dataset.sso); if (m) { say(m); b.disabled = false; } });
+  const pk = $('#pk'); if (pk) pk.onclick = async () => { pk.disabled = true; const m = await passkeySignIn(); if (m) say(m); pk.disabled = false; };
+  $('#lf').onsubmit = async e => { e.preventDefault(); const b = $('#si'); b.disabled = true;
+    const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
+    if (error) say(msg(error)); b.disabled = false; };
+  $('#fp').onclick = async () => { const email = $('#em').value.trim(); if (!email) return say('Type your email first, then press Forgot password.');
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: authRedirect() });
+    if (error) return say(msg(error)); say('If that email has an account, a reset link is on its way. Open it in this same browser.', true); };
+  $('#su').onclick = async () => { const email = $('#em').value.trim(), password = $('#pw').value; if (!email || password.length < 8) return say('Enter an email and a password of 8+ characters.');
+    const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: authRedirect() } });
+    if (error) return say(msg(error)); say(data.session ? 'Account created.' : 'Account created. Confirm the email we just sent, then sign in.', true); };
 }
-function alertBox(e){ $('#app').insertAdjacentHTML('afterbegin', `<div class="err">${esc(plain(e.message||e))} <span class="muted">If this keeps happening, sign out and sign in again.</span></div>`); }
-
-async function render(){
-  const names = { overview:'Overview', sessions:'Sessions', plots:'Demo plots', questions:'Questions', media:'Photos & videos', people:'Partners & people', settings:'Settings' };
-  $('#tabs').innerHTML = Object.entries(names).map(([k,n])=>`<button ${k===tab?'aria-current="page"':''} data-tab="${k}">${n}</button>`).join('');
-  $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
-  $('#app').innerHTML = '<p class="muted">Loading…</p>';
-  try { $('#app').innerHTML = await TABS[tab](); } catch(e){ $('#app').innerHTML=''; alertBox(e); }
+function renderSetPassword() {
+  app.innerHTML = `<div class="login">${logo('Choose a new password', esc(S.user ? S.user.email : ''))}
+  <form class="card" id="pf"><label class="l" for="p1">New password (8+ characters)</label><input class="f" id="p1" type="password" autocomplete="new-password" minlength="8" required>
+  <label class="l" for="p2">Repeat it</label><input class="f" id="p2" type="password" autocomplete="new-password" minlength="8" required>
+  <div class="row" style="margin-top:14px"><button class="btn" type="submit">Save password</button></div><p class="muted" id="pn" style="margin:12px 0 0;min-height:1.4em"></p></form>${loginFoot()}</div>`;
+  $('#pf').onsubmit = async e => { e.preventDefault(); const n = $('#pn');
+    if ($('#p1').value !== $('#p2').value) { n.className = 'err'; n.textContent = 'The two passwords do not match.'; return; }
+    const { error } = await sb.auth.updateUser({ password: $('#p1').value }); if (error) { n.className = 'err'; n.textContent = msg(error); return; }
+    S.recovery = false; toast('Password updated.'); start(); };
+}
+function renderNoAccess(err) {
+  const pub = /^https:\/\//.test(cfg.publicSiteUrl || '') ? cfg.publicSiteUrl : '';
+  app.innerHTML = `<div class="login">${logo('MDF back office', 'Team only.')}<div class="card"><h2>Signed in as ${esc(S.user.email)}</h2><p class="muted">This account is not on the MDF team yet. Ask the owner to add you under Settings → Team.</p>
+  ${err ? `<p class="err">${esc(msg(err))}</p>` : ''}
+  <div class="row">${pub ? `<a class="btn sec" href="${esc(pub)}">Open the Lead Farmer Kit</a>` : ''}<button class="btn sec" id="so">Sign out</button></div>
+  <details style="margin-top:12px"><summary class="muted">First-time setup (very first account only)</summary><div class="row" style="margin-top:8px"><button class="btn" id="claim">Claim owner</button></div>
+  <p class="muted" id="cn" style="margin-top:12px">Claiming works once, for the very first account. Afterwards switch public sign-ups off in Supabase → Authentication → Sign In / Providers.</p></details></div>${loginFoot()}</div>`;
+  $('#so').onclick = () => sb.auth.signOut();
+  $('#claim').onclick = async () => { const { data, error } = await sb.rpc('claim_first_owner');
+    if (error) { $('#cn').className = 'err'; $('#cn').textContent = msg(error); return; }
+    if (data === 'owner') { toast('You are the owner.'); start(); } else { $('#cn').className = 'err'; $('#cn').textContent = 'An owner already exists. Ask them to add you.'; } };
 }
 
-async function boot(){
-  syncAppearance();
-  if (!sb) return showLogin();
-  if (recovery) return showRecovery();
-  const { data:{ session } } = await sb.auth.getSession();
-  if (location.href.includes('#') || location.search) history.replaceState(null, '', location.pathname);
-  if (!session) return showLogin(urlError);
-  let { data:r } = await sb.rpc('my_role');
-  if (!r) { const { data:c } = await sb.rpc('claim_first_owner'); if (c === 'owner') r = 'owner'; }
-  role = r;
-  if (!role) { showLogin('Signed in, but this account is not an admin yet. Ask the owner to add you.'); return; }
-  document.body.classList.remove('signin'); $('#tabs').classList.remove('hidden');
-  render();
+/* ---------- shell ---------- */
+const TABS = [['overview', 'Overview'], ['sessions', 'Sessions'], ['plots', 'Demo plots'], ['questions', 'Questions'], ['media', 'Photos & videos'], ['people', 'Partners & people'], ['settings', 'Settings']];
+const version = () => (document.querySelector('meta[name=app-version]') || {}).content || '';
+function renderShell() {
+  app.innerHTML = `<header class="hdr"><img src="assets/icon.svg" alt=""><b>MDF</b><span class="tag">back office v${esc(version())}</span><span class="sp"></span><small>${esc(S.user.email)} · ${esc(S.role)}</small>${THEME_BTNS}
+  ${cfg.publicSiteUrl ? `<a class="btn sec" href="${esc(cfg.publicSiteUrl)}" target="_blank" rel="noopener">View kit</a>` : ''}<button class="btn sec" id="so">Sign out</button></header>
+  <nav role="tablist" id="nav"></nav><main id="main"></main><footer class="vfoot">MDF back office v${esc(version())} · PROMAS Digital Farmer Learning &amp; Extension</footer>`;
+  $('#so').onclick = () => sb.auth.signOut();
+  $('#nav').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) go(b.dataset.tab); };
+  renderNav();
 }
-sb?.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') { recovery = true; showRecovery(); } if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') boot(); });
-$('#signout').onclick = async () => { await sb?.auth.signOut(); boot(); };
+function go(tab) { S.tab = tab; renderNav(); renderTab(); window.scrollTo(0, 0); }
+function renderNav() {
+  const open = S.feedback.filter(r => r.status === 'open').length, fresh = S.media.filter(r => r.review === 'new').length;
+  const badge = { questions: open, media: fresh };
+  $('#nav').innerHTML = TABS.map(([id, l]) => `<button role="tab" data-tab="${id}" aria-selected="${S.tab === id}">${l}${badge[id] ? `<span class="n">${badge[id]}</span>` : ''}</button>`).join('');
+}
+async function all(table, select = '*') {
+  const out = []; for (let from = 0; ; from += 1000) { const { data, error } = await sb.from(table).select(select).order('created_at', { ascending: false }).range(from, from + 999); if (error) throw error; out.push(...data); if (data.length < 1000) break; } return out;
+}
+const LOADS = { sessions: 'training_sessions', feedback: 'feedback', plots: 'demo_plots', farmers: 'lead_farmers', dealers: 'agrodealers', media: 'step_media' };
+async function load(...keys) {
+  const res = await Promise.all(keys.map(k => all(LOADS[k]).then(d => [k, d], e => [k, null, e])));
+  const bad = res.find(r => r[2]); if (bad) toast('Load problem (' + bad[0] + '): ' + msg(bad[2]));
+  res.forEach(([k, d]) => { if (d) S[k] = d; });
+}
+async function loadAll() {
+  await Promise.all([load(...Object.keys(LOADS)),
+    sb.from('demo_events').select('created_at').order('created_at', { ascending: false }).limit(1).then(r => { S.last.events = r.data && r.data[0] && r.data[0].created_at; }, () => {})]);
+  renderNav();
+}
+function renderTab() { ({ overview: tabOverview, sessions: tabSessions, plots: tabPlots, questions: tabQuestions, media: tabMedia, people: tabPeople, settings: tabSettings })[S.tab](); }
+
+/* ---------- Insight kit: every analytics page is built from these five pieces ----------
+   window row -> Key metrics tiles (value + change vs previous period + sparkline) -> Highlights -> sections -> ranked lists -> grey note. */
+const WINDOWS = [[7, '7 days'], [30, '30 days'], [90, '90 days'], [365, '1 year'], [0, 'Season (lifetime)']];
+const insWindow = (days, id = 'insr') => `<div class="row sp"><span>${days === 0 ? '<span class="life">Lifetime</span>' : ''}</span>
+    <div class="row"><label class="muted" for="${id}">Window</label><select id="${id}" class="f" style="width:auto">${WINDOWS.map(([v, l]) => `<option value="${v}" ${v === days ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>`;
+function sparkBars(vals, label) {
+  if (!vals || !vals.length) return '';
+  const MAX = 48, step = Math.ceil(vals.length / MAX), b = [];
+  for (let i = 0; i < vals.length; i += step) b.push(vals.slice(i, i + step).reduce((a, c) => a + c, 0));
+  const top = Math.max(1, ...b), w = 100 / b.length;
+  return `<svg viewBox="0 0 100 46" preserveAspectRatio="none" role="img" aria-label="${esc(label)}">${b.map((v, i) => { const h = v ? Math.max(2, v / top * 44) : 0; return h ? `<rect x="${(i * w + w * .15).toFixed(2)}" y="${(46 - h).toFixed(2)}" width="${(w * .7).toFixed(2)}" height="${h.toFixed(2)}" rx=".6"/>` : ''; }).join('')}</svg>`;
+}
+function drChg(t, p, life, unit = '%') {
+  if (life || t === null || p === null) return ''; t = Number(t || 0); p = Number(p || 0);
+  if (unit === 'pt') { const d = Math.round(t - p); return `<span class="chg ${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${d > 0 ? '▲ ' : d < 0 ? '▼ ' : ''}${Math.abs(d)} ${Math.abs(d) === 1 ? 'pt' : 'pts'}</span>`; }
+  if (!p && !t) return '<span class="chg">0%</span>'; if (!p) return '<span class="chg up">New</span>';
+  const x = (t - p) / p * 100; if (Math.round(Math.abs(x)) === 0) return '<span class="chg">0%</span>'; return `<span class="chg ${x >= 0 ? 'up' : 'dn'}">${x >= 0 ? '▲' : '▼'} ${Math.abs(x).toFixed(0)}%</span>`;
+}
+/* one tile. go = tab to open on click (optional); chg = drChg(...) html; ser = per-day numbers */
+const insTile = ({ l, v, chg = '', ser = null, go = '' }) => `<${go ? 'button' : 'div'} class="kt"${go ? ` data-go="${go}" title="Open ${esc(l)} details"` : ''}><span class="l">${esc(l)}</span><b>${v === null || v === undefined ? '–' : v}</b>${chg ? `<span class="row" style="gap:6px;margin:0 0 4px">${chg}</span>` : ''}${ser ? sparkBars(ser, l + ' per day') : ''}</${go ? 'button' : 'div'}>`;
+const insTodo = (l, d) => `<div class="kt na"><span class="l">${esc(l)}</span><b>–</b><span class="d">${esc(d)}</span></div>`;
+const insHighlights = (items, none) => items.length ? `<div class="ms">${items.map(m => `<div class="m"><i aria-hidden="true">${esc(m.icon)}</i><div><small>${esc(m.label)}</small>${m.html}</div></div>`).join('')}</div>` : `<div class="none">${none || 'Nothing yet.'}</div>`;
+const insRank = (rows, key, fmt = nf) => rows.length ? rows.map((r, i) => `<div class="rk"><span class="n">${i + 1}</span><span class="t">${esc(r.title)}</span><span class="v">${fmt(r[key])}</span></div>`).join('') : `<div class="none">Nothing yet.</div>`;
+function insWire(el, sel = 'insr') {
+  el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+  const w = el.querySelector('#' + sel); if (w) w.onchange = e => { S.days = +e.target.value; renderTab(); };
+}
+/* the window as [start, end) plus the previous window of the same length; lifetime = everything */
+function win(days) {
+  const now = Date.now(), d = 864e5;
+  if (!days) { const first = Math.min(now, ...S.sessions.map(r => +new Date(r.created_at))); const n = Math.max(1, Math.ceil((now - first) / d) + 1); return { from: now - n * d, to: now + 1, pfrom: 0, pto: 0, n, life: true }; }
+  return { from: now - days * d, to: now + 1, pfrom: now - 2 * days * d, pto: now - days * d, n: days, life: false };
+}
+const inWin = (rows, a, b) => rows.filter(r => { const t = +new Date(r.created_at); return t >= a && t < b; });
+function daily(rows, w, f) { const out = new Array(w.n).fill(0); rows.forEach(r => { const i = Math.floor((+new Date(r.created_at) - w.from) / 864e5); if (i >= 0 && i < w.n) out[i] += f(r); }); return out; }
+function dailyDistinct(rows, w) { const out = Array.from({ length: w.n }, () => new Set()); rows.forEach(r => { const i = Math.floor((+new Date(r.created_at) - w.from) / 864e5); if (i >= 0 && i < w.n) out[i].add(r.device_id); }); return out.map(x => x.size); }
+const sum = (rows, k) => rows.reduce((a, r) => a + (+r[k] || 0), 0);
+const sumBy = (rows, key, val) => { const m = {}; rows.forEach(r => { const k = key(r); if (!k) return; m[k] = (m[k] || 0) + val(r); }); return Object.entries(m).map(([title, v]) => ({ title, v })).sort((a, b) => b.v - a.v); };
+
+/* ---------- overview ---------- */
+function tabOverview() {
+  if (S.days === null) S.days = 30;
+  const days = S.days, w = win(days), cur = inWin(S.sessions, w.from, w.to), prev = w.life ? [] : inWin(S.sessions, w.pfrom, w.pto);
+  const k = rows => { const f = sum(rows, 'farmers_present'); return { sessions: rows.length, farmers: f, women: sum(rows, 'women_present'), active: new Set(rows.map(r => r.device_id)).size, learn: pct(sum(rows, 'could_demonstrate'), f), full: pct(rows.filter(r => r.steps_completed === 6).length, rows.length) }; };
+  const a = k(cur), b = w.life ? {} : k(prev), c = (x, y, u) => drChg(x, y ?? null, w.life, u);
+  const tiles = [
+    insTile({ l: 'Farmers trained', v: nf(a.farmers), chg: c(a.farmers, b.farmers), ser: daily(cur, w, r => r.farmers_present), go: 'sessions' }),
+    insTile({ l: 'Women reached', v: a.farmers ? `${nf(a.women)} <small class="muted" style="font-size:14px">${pct(a.women, a.farmers)}%</small>` : nf(a.women), chg: c(a.women, b.women), ser: daily(cur, w, r => r.women_present), go: 'sessions' }),
+    insTile({ l: 'Training sessions', v: nf(a.sessions), chg: c(a.sessions, b.sessions), ser: daily(cur, w, () => 1), go: 'sessions' }),
+    insTile({ l: 'Active lead farmers', v: nf(a.active), chg: c(a.active, b.active), ser: dailyDistinct(cur, w), go: 'people' }),
+    insTile({ l: 'Could demonstrate', v: a.learn === null ? null : a.learn + '%', chg: a.learn === null ? '' : c(a.learn, b.learn, 'pt'), ser: daily(cur, w, r => r.could_demonstrate) }),
+    insTile({ l: 'All 6 steps done', v: a.full === null ? null : a.full + '%', chg: a.full === null ? '' : c(a.full, b.full, 'pt'), ser: daily(cur, w, r => r.steps_completed === 6 ? 1 : 0) })
+  ].join('');
+
+  // highlights
+  const byMod = Object.keys(MODULES).map(id => { const rs = cur.filter(r => r.module_id === id), f = sum(rs, 'farmers_present'); return { id, title: MODULES[id], n: rs.length, f, p: pct(sum(rs, 'could_demonstrate'), f) }; });
+  const ranked = byMod.filter(m => m.f >= 5).sort((x, y) => y.p - x.p), best = ranked[0], weak = ranked.length > 1 ? ranked[ranked.length - 1] : null;
+  const districts = sumBy(cur, r => r.district, r => r.farmers_present);
+  const open = S.feedback.filter(r => r.status === 'open'), newMedia = S.media.filter(r => r.review === 'new');
+  const hl = [];
+  if (best) hl.push({ icon: '★', label: 'Strongest module', html: `<b>${esc(best.title)}</b>: ${best.p}% of farmers could show the practice.` });
+  if (weak && weak.p < best.p) hl.push({ icon: '!', label: 'Needs a re-run', html: `<b>${esc(weak.title)}</b> is lowest at ${weak.p}%. Plan a Reinforce visit.` });
+  if (districts[0]) hl.push({ icon: '⌂', label: 'Busiest district', html: `<b>${esc(districts[0].title)}</b> trained ${nf(districts[0].v)} farmers.` });
+  hl.push({ icon: '?', label: 'Questions waiting', html: open.length ? `<b>${open.length}</b> open. Oldest from ${esc(ago(open[open.length - 1].created_at))}. <button class="lk" data-go="questions">Answer</button>` : 'None. Every question has an answer.' });
+  if (newMedia.length) hl.push({ icon: '▣', label: 'Field photos to review', html: `<b>${newMedia.length}</b> new photos or videos. <button class="lk" data-go="media">Review</button>` });
+
+  const modBars = byMod.map(m => `<div class="hbar" title="${m.n} sessions, ${m.f} farmers"><span class="t">${esc(m.title)}</span><span class="b"><i style="width:${m.p || 0}%"></i></span><span class="v">${m.p === null ? '–' : m.p + '%'}</span></div>`).join('');
+  const topLF = sumBy(cur, r => r.lead_farmer || null, r => r.farmers_present).slice(0, 6);
+  const topVil = sumBy(cur, r => [r.village, r.district].filter(Boolean).join(', ') || null, r => r.farmers_present).slice(0, 6);
+  const plotsActive = S.plots.filter(p => p.status === 'established' || p.status === 'harvested').length;
+  const samples = S.sessions.some(r => r.is_sample);
+  const last = t => (S[t][0] || {}).created_at;
+  const health = [['Sessions', last('sessions')], ['Questions', last('feedback')], ['Kit events', S.last.events], ['Photos & videos', last('media')], ['Demo plots', last('plots')]];
+
+  $('#main').innerHTML = `<div class="ins"><h2>Overview</h2><div id="insbody">${insWindow(days)}
+    <div class="sec">Key metrics</div><div class="tiles">${tiles}</div>
+    <div class="sec">Highlights</div>${insHighlights(hl)}
+    <div class="sec">Learning by module <span class="muted" style="font-weight:400;font-size:12px">share of farmers who could demonstrate the practice</span></div><div class="card">${modBars}</div>
+    <div class="sec">Still to measure</div><div class="tiles t4">
+      ${insTodo('Adoption', 'Needs a follow-up farm visit survey (KoboToolbox).')}
+      ${insTodo('Productivity', `Yield on demo plots vs comparison farms. ${plotsActive} plots active.`)}
+      ${insTodo('Efficiency', 'Cost per farmer reached: add a costs sheet.')}
+      ${insTodo('Sustainability', 'Agrodealers still funding it after PROMAS.')}</div>
+    <div class="tops"><div><div class="sec row sp">Top lead farmers <button class="lk" data-go="people">See all</button></div>${insRank(topLF, 'v')}</div>
+      <div><div class="sec row sp">Top villages <button class="lk" data-go="sessions">See all</button></div>${insRank(topVil, 'v')}</div></div>
+    <div class="sec">Pipeline health</div><p class="muted" style="margin:0 0 8px">Last time each kind of record reached the database. If phones are in use but a row says “never”, that path is broken.</p>
+    <div class="row">${health.map(([l, t]) => `<span class="pill ${t ? 'ok' : 'warn'}">${l}: ${ago(t)}</span>`).join('')}</div>
+    <div class="row" style="margin-top:14px"><button class="btn sec" id="csv">Export sessions CSV</button></div>
+    <p class="muted" style="font-size:12px;margin-top:14px">Counts come from lessons that lead farmers finish in the kit; phones send them when they have signal, so the last few days can still grow. Ranked lists count farmers trained. ${samples ? 'Sample rows are included until you run <b>supabase/remove_samples.sql</b>.' : ''}</p></div></div>`;
+  $('#csv').onclick = () => downloadCSV('sessions', cur);
+  insWire($('#main'));
+}
+
+/* ---------- CSV ---------- */
+const csvCell = v => { let s = v == null ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v)); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+function downloadCSV(name, rows) {
+  if (!rows.length) return toast('Nothing to export in this window.');
+  const cols = Object.keys(rows[0]); const csv = [cols.join(',')].concat(rows.map(r => cols.map(c => csvCell(r[c])).join(','))).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = `mdf-${name}-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`Exported ${rows.length} rows.`);
+}
+/* a small text box instead of window.prompt */
+function ask(title, help, value = '') {
+  const d = $('#dlg'); $('#dlgt').textContent = title; $('#dlgh').textContent = help; $('#dlgx').value = value; d.returnValue = '';
+  return new Promise(res => { d.onclose = () => res(d.returnValue === 'ok' ? $('#dlgx').value.trim() : null); d.showModal(); $('#dlgx').focus(); });
+}
+const tableCard = (head, rows, empty) => rows ? `<div class="card tw"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="card"><p class="muted" style="margin:0">${empty}</p></div>`;
+
+/* ---------- sessions ---------- */
+function tabSessions() {
+  const rows = S.sessions;
+  $('#main').innerHTML = `<div class="row sp"><h2>Training sessions <span class="muted" style="font-weight:400">${nf(rows.length)}</span></h2><button class="btn sec" id="csv">Export CSV</button></div>
+  ${tableCard('<th>When</th><th>Lead farmer</th><th>Village / district</th><th>Module</th><th class="num">Steps</th><th class="num">Present (women)</th><th class="num">Could demonstrate</th>',
+    rows.map(r => `<tr><td>${esc(fmtDate(r.created_at))}</td><td>${esc(r.lead_farmer || '—')}${sampleTag(r)}</td><td>${esc([r.village, r.district].filter(Boolean).join(', '))}</td><td>${esc(MODULES[r.module_id] || r.module_id)}</td><td class="num">${r.steps_completed}/6</td><td class="num">${r.farmers_present} (${r.women_present})</td><td class="num">${r.could_demonstrate} <span class="muted">${r.farmers_present ? pct(r.could_demonstrate, r.farmers_present) + '%' : ''}</span></td></tr>`).join(''),
+    'No sessions yet. They arrive when lead farmers finish a lesson and have signal.')}`;
+  $('#csv').onclick = () => downloadCSV('sessions', rows);
+}
+
+/* ---------- demo plots ---------- */
+function tabPlots() {
+  const lfName = id => (S.farmers.find(l => l.id === id) || {}).name || '—';
+  const pill = s => `<span class="pill ${s === 'established' || s === 'harvested' ? 'ok' : s === 'abandoned' ? 'bad' : 'warn'}">${esc(s)}</span>`;
+  $('#main').innerHTML = `<div class="row sp"><h2>Demonstration plots <span class="muted" style="font-weight:400">${S.plots.length}</span></h2><button class="btn sec" id="csv">Export CSV</button></div>
+  ${canEdit() ? `<form class="card" id="pf"><h3>Add a plot</h3><div class="form">
+    <div><label class="l" for="p_lf">Lead farmer</label><select class="f" id="p_lf"><option value="">—</option>${S.farmers.map(l => `<option value="${l.id}">${esc(l.name)} · ${esc(l.village || '')}</option>`).join('')}</select></div>
+    <div><label class="l" for="p_crop">Crop</label><select class="f" id="p_crop"><option>maize</option><option>groundnut</option><option>sesame</option><option>pigeonpea</option></select></div>
+    <div><label class="l" for="p_var">Variety</label><input class="f" id="p_var"></div>
+    <div><label class="l" for="p_date">Planting date</label><input class="f" id="p_date" type="date"></div>
+    <div><label class="l" for="p_lat">Latitude</label><input class="f" id="p_lat" inputmode="decimal"></div>
+    <div><label class="l" for="p_lon">Longitude <button type="button" class="lk" id="gps">use my GPS</button></label><input class="f" id="p_lon" inputmode="decimal"></div>
+    <div><label class="l" for="p_status">Status</label><select class="f" id="p_status"><option>planned</option><option>established</option><option>harvested</option><option>abandoned</option></select></div>
+  </div><button class="btn" style="margin-top:12px" type="submit">Save plot</button></form>` : ''}
+  ${tableCard('<th>Lead farmer</th><th>Crop / variety</th><th>Planted</th><th class="num">Week</th><th>Status</th><th>Map</th><th class="num">Yield kg/ha</th>',
+    S.plots.map(p => { const wk = p.planting_date ? Math.floor((Date.now() - new Date(p.planting_date)) / 6048e5) : null;
+      return `<tr><td>${esc(lfName(p.lead_farmer_id))}${sampleTag(p)}</td><td>${esc(p.crop)} ${esc(p.variety || '')}</td><td>${esc(p.planting_date || '—')}</td><td class="num">${wk ?? '—'}</td><td>${pill(p.status)}</td><td>${p.lat != null ? `<a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${+p.lat}&mlon=${+p.lon}#map=15/${+p.lat}/${+p.lon}">OSM</a>` : '—'}</td><td class="num">${p.final_yield_kg_ha ?? '—'}</td></tr>`; }).join(''),
+    'No plots yet.')}
+  <p class="muted" style="font-size:12px">Stage-by-stage observations: technicians collect them offline with the KoboToolbox form (SETUP.md step 6). Photos from lead farmers show up under Photos &amp; videos.</p>`;
+  $('#csv').onclick = () => downloadCSV('demo_plots', S.plots);
+  const f = $('#pf'); if (!f) return;
+  $('#gps').onclick = () => navigator.geolocation ? navigator.geolocation.getCurrentPosition(p => { $('#p_lat').value = p.coords.latitude.toFixed(5); $('#p_lon').value = p.coords.longitude.toFixed(5); }, e => toast(e.message)) : toast('This browser has no GPS.');
+  f.onsubmit = async e => { e.preventDefault(); const v = id => $('#' + id).value.trim() || null, n = id => v(id) === null ? null : +v(id);
+    const { error } = await sb.from('demo_plots').insert({ lead_farmer_id: v('p_lf'), crop: v('p_crop'), variety: v('p_var'), planting_date: v('p_date'), lat: n('p_lat'), lon: n('p_lon'), status: v('p_status') });
+    if (error) return toast(msg(error)); toast('Plot saved.'); await load('plots'); tabPlots(); };
+}
+
+/* ---------- questions ---------- */
+function tabQuestions() {
+  const order = { open: 0, escalated: 1, answered: 2 };
+  const list = [...S.feedback].sort((a, b) => order[a.status] - order[b.status] || new Date(b.created_at) - new Date(a.created_at));
+  const pill = s => `<span class="pill ${s === 'answered' ? 'ok' : s === 'open' ? 'warn' : 'bad'}">${esc(s === 'escalated' ? 'with content team' : s)}</span>`;
+  $('#main').innerHTML = `<h2>Questions from lead farmers</h2>
+  ${tableCard('<th>Question</th><th>Status</th><th></th>', list.map(r => `<tr><td><span class="muted">${esc([r.village, r.district].filter(Boolean).join(', ') || 'Unknown place')} · ${esc(r.kind)} · ${ago(r.created_at)}</span>${sampleTag(r)}<div style="overflow-wrap:anywhere">${esc(r.message)}</div>${r.answer ? `<div class="muted">↳ ${esc(r.answer)}</div>` : ''}</td><td>${pill(r.status)}</td>
+    <td class="row" style="flex-wrap:nowrap">${canEdit() && r.status !== 'answered' ? `<button class="btn sec sm" data-ans="${r.id}">Answer</button>${r.status === 'open' ? `<button class="btn sec sm" data-esc="${r.id}">To content team</button>` : ''}` : ''}</td></tr>`).join(''), 'No questions yet.')}
+  <p class="muted" style="font-size:12px">Answers are saved here. Send them back to the lead farmer on WhatsApp too: the kit has no inbox yet.</p>`;
+  $('#main').onclick = async e => { const b = e.target.closest('[data-ans],[data-esc]'); if (!b) return;
+    let patch;
+    if (b.dataset.ans) { const r = S.feedback.find(x => String(x.id) === b.dataset.ans); const a = await ask('Answer', r ? r.message : '', r && r.answer || ''); if (!a) return; patch = [b.dataset.ans, { answer: a, status: 'answered', answered_at: new Date().toISOString() }]; }
+    else patch = [b.dataset.esc, { status: 'escalated' }];
+    b.disabled = true; const { error } = await sb.from('feedback').update(patch[1]).eq('id', patch[0]);
+    if (error) { b.disabled = false; return toast(msg(error)); }
+    const r = S.feedback.find(x => String(x.id) === patch[0]); if (r) Object.assign(r, patch[1]); toast('Saved.'); renderNav(); tabQuestions(); };
+}
+
+/* ---------- photos & videos ---------- */
+async function tabMedia() {
+  const rows = S.media, f = S.mf;
+  const plots = [...new Set(rows.map(r => r.plot_code || '—'))].sort();
+  const shown = rows.filter(r => (!f.plot || (r.plot_code || '—') === f.plot) && (!f.module || (r.module_id || 'plot') === f.module) && (!f.review || r.review === f.review));
+  const sel = (k, opts) => `<select class="f" data-mf="${k}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === f[k] ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  $('#main').innerHTML = `<h2>Photos &amp; videos from the field</h2>
+  <div class="form" style="margin-bottom:6px">
+    <div><label class="l">Demo plot</label>${sel('plot', [['', 'All plots'], ...plots.map(p => [p, p])])}</div>
+    <div><label class="l">Module</label>${sel('module', [['', 'All'], ...Object.entries(MODULES), ['plot', 'Demo plot']])}</div>
+    <div><label class="l">Review</label>${sel('review', [['', 'All'], ['new', 'New'], ['good', 'Good'], ['needs_help', 'Needs help'], ['hidden', 'Hidden']])}</div></div>
+  <p class="muted" style="font-size:12px">${shown.length} of ${rows.length} items${shown.length > 200 ? ' (first 200 shown)' : ''}. Links expire after 1 hour; reopen the tab to refresh.</p><div id="mbody"><div class="skel" style="height:180px"></div></div>`;
+  $('#main').querySelectorAll('[data-mf]').forEach(s => s.onchange = () => { f[s.dataset.mf] = s.value; tabMedia(); });
+  const urls = {}, paths = shown.slice(0, 200).map(r => r.storage_path);
+  if (paths.length) { const { data, error } = await sb.storage.from('step-media').createSignedUrls(paths, 3600); if (error) toast(msg(error)); (data || []).forEach(d => { if (d.signedUrl) urls[d.path] = d.signedUrl; }); }
+  if (S.tab !== 'media' || !$('#mbody')) return;
+  const groups = {}; shown.slice(0, 200).forEach(r => { const g = `${r.plot_code || 'No plot code'} · ${MODULES[r.module_id] || 'Demo plot'} · ${STEPS[r.step_id] || r.step_id}`; (groups[g] ||= []).push(r); });
+  const rp = s => `<span class="pill ${s === 'good' ? 'ok' : s === 'needs_help' ? 'bad' : s === 'new' ? 'warn' : ''}">${esc(s.replace('_', ' '))}</span>`;
+  const card = r => { const u = urls[r.storage_path];
+    const media = !u ? '<div class="mm none">not loaded</div>' : r.kind === 'video' ? `<video class="mm" controls preload="metadata" src="${esc(u)}"></video>` : `<a href="${esc(u)}" target="_blank" rel="noopener"><img class="mm" src="${esc(u)}" alt="${esc(r.caption || '')}" loading="lazy"></a>`;
+    return `<div class="mcard">${media}<div style="font-size:13px;margin-top:6px"><b>${esc(r.lead_farmer || '—')}</b> · ${esc(r.village || '')}${sampleTag(r)}<br><span class="muted">${esc(fmtDate(r.taken_at || r.created_at))} · ${Math.round(r.bytes / 1024)} KB</span> ${rp(r.review)}${r.caption ? `<div>${esc(r.caption)}</div>` : ''}${r.reviewer_note ? `<div class="muted">↳ ${esc(r.reviewer_note)}</div>` : ''}</div>
+      ${canEdit() ? `<div class="row" style="gap:4px;margin-top:6px"><button class="btn sec sm" data-rv="good" data-id="${r.id}">✓ Good</button><button class="btn sec sm" data-rv="needs_help" data-id="${r.id}">Needs help</button><button class="btn sec sm" data-rv="hidden" data-id="${r.id}">Hide</button></div>` : ''}</div>`; };
+  $('#mbody').innerHTML = Object.entries(groups).map(([g, items]) => `<div class="sec" style="margin:18px 0 8px;font-weight:700">${esc(g)} <span class="muted" style="font-weight:400">(${items.length})</span></div><div class="mgrid">${items.map(card).join('')}</div>`).join('') || '<div class="card"><p class="muted" style="margin:0">No photos or videos yet. They arrive when lead farmers add them in a lesson and have signal.</p></div>';
+  $('#mbody').onclick = async e => { const b = e.target.closest('[data-rv]'); if (!b) return;
+    const note = b.dataset.rv === 'needs_help' ? await ask('What should the lead farmer fix?', 'Saved here. Send it on WhatsApp too.') : null;
+    if (b.dataset.rv === 'needs_help' && note === null) return;
+    const { error } = await sb.from('step_media').update({ review: b.dataset.rv, reviewer_note: note }).eq('id', b.dataset.id); if (error) return toast(msg(error));
+    const r = S.media.find(x => String(x.id) === b.dataset.id); if (r) Object.assign(r, { review: b.dataset.rv, reviewer_note: note }); renderNav(); tabMedia(); };
+}
+
+/* ---------- partners & people ---------- */
+function tabPeople() {
+  const dName = id => (S.dealers.find(d => d.id === id) || {}).name || '—';
+  const season = s => s === 1 ? 'New' : s === 2 ? '2nd season' : '3rd+ (graduating)';
+  const support = s => s === 1 ? 'Kits, plot instructions, calendar' : s === 2 ? '+ monitoring, regular audio/video, feedback' : 'Runs content, calendar and monitoring with less PROMAS support';
+  const trained = {}; S.sessions.forEach(r => { if (r.lead_farmer) trained[r.lead_farmer] = (trained[r.lead_farmer] || 0) + r.farmers_present; });
+  $('#main').innerHTML = `<h2>Partners &amp; people</h2>
+  <div class="sec" style="font-weight:700;margin:6px 0 8px">Agrodealers <span class="muted" style="font-weight:400">${S.dealers.length}</span></div>
+  ${tableCard('<th>Name</th><th>District</th><th>Partnership</th><th>Digital support level</th>', S.dealers.map(d => `<tr><td>${esc(d.name)}${sampleTag(d)}</td><td>${esc(d.district || '')}</td><td>${season(d.partnership_season)}</td><td class="muted">${support(d.partnership_season)}</td></tr>`).join(''), 'No agrodealers yet.')}
+  ${canEdit() ? `<form class="card" id="df"><h3>Add an agrodealer</h3><div class="form"><div><label class="l" for="d_name">Name</label><input class="f" id="d_name" required></div><div><label class="l" for="d_district">District</label><input class="f" id="d_district"></div><div><label class="l" for="d_season">Partnership season</label><select class="f" id="d_season"><option>1</option><option>2</option><option>3</option></select></div></div><button class="btn" style="margin-top:12px" type="submit">Add agrodealer</button></form>` : ''}
+  <div class="sec" style="font-weight:700;margin:22px 0 8px">Lead farmers <span class="muted" style="font-weight:400">${S.farmers.length}</span></div>
+  ${tableCard('<th>Name</th><th>Sex</th><th>Village / district</th><th>Agrodealer</th><th class="num">Farmers trained</th><th>Phone</th>', S.farmers.map(l => `<tr><td>${esc(l.name)}${sampleTag(l)}</td><td>${esc(l.sex || '')}</td><td>${esc([l.village, l.district].filter(Boolean).join(', '))}</td><td>${esc(dName(l.agrodealer_id))}</td><td class="num">${nf(trained[l.name] || 0)}</td><td>${l.phone ? `<a href="https://wa.me/${esc(l.phone.replace(/\D/g, ''))}" target="_blank" rel="noopener">${esc(l.phone)}</a>` : ''}</td></tr>`).join(''), 'No lead farmers yet.')}
+  ${canEdit() ? `<form class="card" id="lff"><h3>Add a lead farmer</h3><div class="form"><div><label class="l" for="l_name">Name</label><input class="f" id="l_name" required></div><div><label class="l" for="l_sex">Sex</label><select class="f" id="l_sex"><option value="">—</option><option value="f">F</option><option value="m">M</option></select></div><div><label class="l" for="l_village">Village</label><input class="f" id="l_village"></div><div><label class="l" for="l_district">District</label><input class="f" id="l_district"></div><div><label class="l" for="l_phone">Phone (WhatsApp)</label><input class="f" id="l_phone" inputmode="tel"></div><div><label class="l" for="l_dealer">Agrodealer</label><select class="f" id="l_dealer"><option value="">—</option>${S.dealers.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select></div></div><button class="btn" style="margin-top:12px" type="submit">Add lead farmer</button></form>` : ''}
+  <p class="muted" style="font-size:12px">“Farmers trained” matches the name a lead farmer types in the kit, so keep names spelled the same in both places.</p>`;
+  const v = id => $('#' + id).value.trim() || null;
+  const df = $('#df'); if (df) df.onsubmit = async e => { e.preventDefault(); const { error } = await sb.from('agrodealers').insert({ name: v('d_name'), district: v('d_district'), partnership_season: +v('d_season') || 1 }); if (error) return toast(msg(error)); toast('Agrodealer added.'); await load('dealers'); tabPeople(); };
+  const lf = $('#lff'); if (lf) lf.onsubmit = async e => { e.preventDefault(); const { error } = await sb.from('lead_farmers').insert({ name: v('l_name'), sex: v('l_sex'), village: v('l_village'), district: v('l_district'), phone: v('l_phone'), agrodealer_id: v('l_dealer') }); if (error) return toast(msg(error)); toast('Lead farmer added.'); await load('farmers'); tabPeople(); };
+}
+
+/* ---------- settings ---------- */
+function tabSettings() {
+  const owner = S.role === 'owner';
+  $('#main').innerHTML = `<h2>Settings</h2>
+  <div class="card" id="team"><h3>Team</h3><p class="muted">Loading…</p></div>
+  <div class="card" id="sec"><h3>Sign-in methods</h3><p class="muted">Loading…</p></div>
+  <form class="card" id="cp"><h3>Change password</h3><div class="row"><input class="f" id="np" type="password" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)" style="flex:1;min-width:200px" required><button class="btn" type="submit">Update</button></div></form>
+  <div class="card"><h3>Appearance</h3><p class="muted" style="margin:0">The round button cycles Light → Dark → Auto (Auto follows your device). Warm adds an amber layer for night work. Both are saved in this browser.</p></div>
+  <div class="card"><h3>Safety checklist</h3><ul class="muted" style="margin:0;padding-left:18px"><li>This page uses only the publishable key. Never put the service_role key in any file.</li><li>After the owner account exists, turn OFF “Allow new users to sign up” in Supabase → Authentication → Sign In / Providers.</li><li>Viewers can read everything; editors can also answer, review and add; only the owner can change the team.</li><li>Field photos stay in a private bucket and open through links that expire after 1 hour.</li></ul></div>`;
+  $('#cp').onsubmit = async e => { e.preventDefault(); const { error } = await sb.auth.updateUser({ password: $('#np').value }); if (error) toast(msg(error)); else { toast('Password updated.'); $('#np').value = ''; } };
+  renderTeam(owner); renderSecurity();
+}
+async function renderTeam(owner) {
+  const box = $('#team'); const { data, error } = await sb.rpc('admin_team'); if (!$('#team')) return;
+  const missing = error && /admin_team|admin_grant|schema cache|does not exist|PGRST202/i.test(error.message || '');
+  box.innerHTML = `<h3>Team</h3>${missing ? '<p class="muted">One step left: open <b>supabase/migrations/20261127000000_team_by_email.sql</b>, paste its contents into the Supabase SQL editor and press Run. Then reload this tab.</p>' : error ? `<p class="err">${esc(msg(error))}</p>` :
+    (data || []).map(m => `<div class="idrow"><b>${esc(m.email)}</b><span class="pill ${m.role === 'owner' ? 'ok' : ''}">${esc(m.role)}</span><span class="muted">since ${esc(new Date(m.since).toLocaleDateString())}</span></div>`).join('')}
+  ${owner && !missing ? `<form id="af" style="margin-top:12px"><p class="muted" style="margin:0 0 8px">They create an account on the sign-in page first; then enter the same email here.</p><div class="row"><input class="f" id="ae" type="email" placeholder="email@example.org" style="flex:1;min-width:200px" required><select class="f" id="ar" style="width:auto"><option value="editor">Editor</option><option value="viewer">Viewer</option><option value="owner">Owner</option></select><button class="btn" type="submit">Add to team</button></div></form>` : owner ? '' : '<p class="muted" style="margin:8px 0 0">Only the owner can add people.</p>'}`;
+  const af = $('#af'); if (af) af.onsubmit = async e => { e.preventDefault(); const { data: r, error: er } = await sb.rpc('admin_grant', { p_email: $('#ae').value.trim(), p_role: $('#ar').value });
+    if (er) return toast(msg(er)); if (r === 'no_account') return toast('No account with that email yet. Ask them to press Create account first.'); toast('Added as ' + r + '.'); renderTeam(owner); };
+}
+async function renderSecurity() {
+  const box = $('#sec'); if (!box) return;
+  const ids = await sb.auth.getUserIdentities().then(r => (r.data && r.data.identities) || []).catch(() => []);
+  let pks = []; try { const r = await sb.auth.passkey.list(); const d = r.data; pks = Array.isArray(d) ? d : (d && d.passkeys) || []; } catch (e) { pks = null; }
+  if (!$('#sec')) return;
+  const have = new Set(ids.map(i => i.provider === 'custom:yahoo' || i.provider === 'yahoo' ? 'custom:yahoo' : i.provider));
+  box.innerHTML = `<h3>Sign-in methods</h3><p class="muted" style="margin-top:0">Link more ways into this same account. Your email and password keep working.</p>
+  ${ids.map(i => `<div class="idrow"><b>${esc(i.provider === 'email' ? 'Email and password' : provName(i.provider))}</b><span class="muted">${esc((i.identity_data && i.identity_data.email) || '')}</span>${ids.length > 1 ? `<button class="btn bad sm" data-unlink="${esc(i.identity_id)}" type="button">Unlink</button>` : ''}</div>`).join('') || '<p class="muted">No linked methods found.</p>'}
+  <div class="sso" style="margin-top:10px">${PROVIDERS.filter(p => !have.has(p[0])).map(p => `<button class="btn sec" type="button" data-link="${p[0]}">${p[2]}Link ${p[1]}</button>`).join('')}</div>
+  <h3 style="margin-top:16px">Passkeys</h3>
+  ${pks === null ? '<p class="muted">Passkeys are not available on this project yet (enable them in Supabase → Authentication → Passkeys).</p>' : (pks.map(k => `<div class="idrow"><b>${esc(k.friendly_name || 'Passkey')}</b><span class="muted">${k.last_used_at ? 'used ' + esc(new Date(k.last_used_at).toLocaleDateString()) : 'not used yet'}</span><button class="btn sec sm" data-pkr="${esc(k.id)}" type="button">Rename</button><button class="btn bad sm" data-pkd="${esc(k.id)}" type="button">Delete</button></div>`).join('') || '<p class="muted">No passkeys yet.</p>') + '<div class="row" style="margin-top:8px"><button class="btn" id="pkadd" type="button">Add a passkey on this device</button></div>'}
+  <p class="err" id="sec-n"></p>`;
+  const note = t => { $('#sec-n').textContent = t || ''; };
+  box.onclick = async e => { const b = e.target.closest('button'); if (!b) return;
+    try {
+      if (b.dataset.link) { const m = await oauthGo(b.dataset.link, true); if (m) note(m + ' (Linking also needs “Allow manual linking” on in Supabase → Authentication → Sign In / Providers.)'); }
+      else if (b.dataset.unlink) { if (!confirm('Unlink this sign-in method?')) return; const id = ids.find(i => i.identity_id === b.dataset.unlink); const { error } = await sb.auth.unlinkIdentity(id); if (error) note(msg(error)); else renderSecurity(); }
+      else if (b.id === 'pkadd') { const { error } = await sb.auth.registerPasskey(); if (error) note(msg(error)); else { toast('Passkey added.'); renderSecurity(); } }
+      else if (b.dataset.pkd) { if (!confirm('Delete this passkey?')) return; const { error } = await sb.auth.passkey.delete({ passkeyId: b.dataset.pkd }); if (error) note(msg(error)); else renderSecurity(); }
+      else if (b.dataset.pkr) { const n = await ask('Name this passkey', 'For example “Lichinga laptop”.'); if (!n) return; const { error } = await sb.auth.passkey.update({ passkeyId: b.dataset.pkr, friendlyName: n.slice(0, 60) }); if (error) note(msg(error)); else renderSecurity(); }
+    } catch (er) { note(plain(er.name || er.message)); } };
+}
+
 boot();
+})();
 </script>
 </body>
 </html>
