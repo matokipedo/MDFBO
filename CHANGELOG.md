@@ -16,3 +16,10 @@
 - Connection settings moved to config.js; supabase-js loads with an integrity hash.
 - Version footer on every screen, including sign-in, new password and no-access.
 - Migration 20261127000000_team_by_email.sql: admin_grant(email, role) and admin_team(). Tested on Postgres 16 (supabase/tests/team_test.sql).
+
+## 1.4.0 (2026-11-28)
+- Closer match to the Triber back office: three new drill-down tabs built the same way as Triber's Trends / Places / Music.
+- Trends: pick a measure (farmers trained, women, sessions, active lead farmers, could demonstrate, questions, photos & videos), split it (module, step, district, village, lead farmer, crop, language, question type, demo plot), pick a period; line chart with hover tooltip, this vs previous table, click a row to zoom in (filter chips).
+- Places: map of northern Mozambique with district circles and demo-plot squares; click a district to see its villages.
+- Lessons: the same drill-down starting from the five modules.
+- Overview: key-metric tiles open Trends on that measure; new Top districts section with the map (like Triber's Top cities).
