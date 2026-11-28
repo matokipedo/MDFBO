@@ -154,7 +154,7 @@ const MODULES = { m1: '1 Preparing for planting', m2: '2 Planting correctly', m3
 const STEPS = { introduce: '1 Introduce', explain: '2 Explain', demonstrate: '3 Demonstrate', practice: '4 Practice', check: '5 Check', reinforce: '6 Reinforce', plot: 'Demo plot' };
 
 if (!cfg.supabaseUrl || !cfg.supabaseKey) {
-  app.innerHTML = `<div class="login"><div class="card"><h2>Not connected yet</h2><p class="muted">Open <code>config.js</code> and paste the Supabase project URL and the <b>publishable (anon)</b> key. Never paste the service_role key here.</p></div></div>`;
+  app.innerHTML = `<div class="login"><div class="card"><h2>Not connected yet</h2><p class="muted">Open <code>config.js</code> and paste the Supabase project URL and the <b>publishable (anon)</b> key. Never paste the service_role key here.</p></div><footer class="vfoot">MDF back office v${(document.querySelector('meta[name=app-version]') || {}).content || ''}</footer></div>`;
   return;
 }
 let sb;
@@ -165,7 +165,7 @@ const sampleTag = r => r && r.is_sample ? ' <span class="pill sample">sample</sp
 /* ---------- boot ---------- */
 async function boot() {
   if (!window.supabase) await new Promise(r => { const t = setInterval(() => { if (window.supabase) { clearInterval(t); r(); } }, 50); setTimeout(() => { clearInterval(t); r(); }, 6000); });
-  if (!window.supabase) { app.innerHTML = `<div class="login"><div class="card err">Could not load the Supabase library. Check your connection and reload.</div></div>`; return; }
+  if (!window.supabase) { app.innerHTML = `<div class="login"><div class="card err">Could not load the Supabase library. Check your connection and reload.</div><footer class="vfoot">MDF back office v${esc(version())}</footer></div>`; return; }
   sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { storageKey: 'mdfbo_auth', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, experimental: { passkey: cfg.passkeys !== false } } });
   const hp = new URLSearchParams(location.hash.slice(1) + '&' + location.search.slice(1)); S.recovery = hp.get('type') === 'recovery'; if (hp.get('error_description')) S.note = 'Sign-in failed: ' + hp.get('error_description').replace(/\+/g, ' ');
   const { data } = await sb.auth.getSession();
@@ -205,6 +205,7 @@ async function oauthGo(provider, link) {
   } catch (e) { return msg(e); }
 }
 async function passkeySignIn() { try { const { error } = await sb.auth.signInWithPasskey(); return error ? msg(error) : ''; } catch (e) { return plain(e.name || e.message); } }
+const loginFoot = () => `<footer class="vfoot">MDF back office v${esc(version())} · PROMAS Digital Farmer Learning &amp; Extension</footer>`;
 const logo = (title, sub) => `<div class="logo"><img src="assets/icon.svg" alt=""><h2 style="margin:8px 0 0">${title}</h2><div class="muted">${sub}</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center">${THEME_BTNS}</div></div>`;
 function renderLogin(note) {
   app.innerHTML = `<div class="login">${logo('MDF back office', 'Digital Farmer Learning &amp; Extension. Team only.')}
@@ -213,7 +214,7 @@ function renderLogin(note) {
   <label class="l" for="pw">Password</label><input class="f" id="pw" type="password" autocomplete="current-password" minlength="8" required>
   <div class="row" style="margin-top:14px"><button class="btn" id="si" type="submit">Sign in</button><button class="btn sec" id="su" type="button">Create account</button><button class="btn sec" id="fp" type="button">Forgot password?</button></div>
   <p class="${note && note.startsWith('Sign-in failed') ? 'err' : 'muted'}" id="ln" style="margin:12px 0 0;min-height:1.4em">${esc(note || '')}</p>
-  <p class="muted" style="font-size:12px;margin:8px 0 0">First time? Sign in with email and password once, then link Google, Apple, Microsoft, Yahoo or a passkey under Settings → Sign-in methods. New accounts must be added to the team by the owner before they can see anything.</p></form></div>`;
+  <p class="muted" style="font-size:12px;margin:8px 0 0">First time? Sign in with email and password once, then link Google, Apple, Microsoft, Yahoo or a passkey under Settings → Sign-in methods. New accounts must be added to the team by the owner before they can see anything.</p></form>${loginFoot()}</div>`;
   const say = (t, ok) => { $('#ln').className = ok ? 'ok' : 'err'; $('#ln').textContent = t; };
   document.querySelectorAll('[data-sso]').forEach(b => b.onclick = async () => { b.disabled = true; const m = await oauthGo(b.dataset.sso); if (m) { say(m); b.disabled = false; } });
   const pk = $('#pk'); if (pk) pk.onclick = async () => { pk.disabled = true; const m = await passkeySignIn(); if (m) say(m); pk.disabled = false; };
@@ -231,7 +232,7 @@ function renderSetPassword() {
   app.innerHTML = `<div class="login">${logo('Choose a new password', esc(S.user ? S.user.email : ''))}
   <form class="card" id="pf"><label class="l" for="p1">New password (8+ characters)</label><input class="f" id="p1" type="password" autocomplete="new-password" minlength="8" required>
   <label class="l" for="p2">Repeat it</label><input class="f" id="p2" type="password" autocomplete="new-password" minlength="8" required>
-  <div class="row" style="margin-top:14px"><button class="btn" type="submit">Save password</button></div><p class="muted" id="pn" style="margin:12px 0 0;min-height:1.4em"></p></form></div>`;
+  <div class="row" style="margin-top:14px"><button class="btn" type="submit">Save password</button></div><p class="muted" id="pn" style="margin:12px 0 0;min-height:1.4em"></p></form>${loginFoot()}</div>`;
   $('#pf').onsubmit = async e => { e.preventDefault(); const n = $('#pn');
     if ($('#p1').value !== $('#p2').value) { n.className = 'err'; n.textContent = 'The two passwords do not match.'; return; }
     const { error } = await sb.auth.updateUser({ password: $('#p1').value }); if (error) { n.className = 'err'; n.textContent = msg(error); return; }
@@ -243,7 +244,7 @@ function renderNoAccess(err) {
   ${err ? `<p class="err">${esc(msg(err))}</p>` : ''}
   <div class="row">${pub ? `<a class="btn sec" href="${esc(pub)}">Open the Lead Farmer Kit</a>` : ''}<button class="btn sec" id="so">Sign out</button></div>
   <details style="margin-top:12px"><summary class="muted">First-time setup (very first account only)</summary><div class="row" style="margin-top:8px"><button class="btn" id="claim">Claim owner</button></div>
-  <p class="muted" id="cn" style="margin-top:12px">Claiming works once, for the very first account. Afterwards switch public sign-ups off in Supabase → Authentication → Sign In / Providers.</p></details></div></div>`;
+  <p class="muted" id="cn" style="margin-top:12px">Claiming works once, for the very first account. Afterwards switch public sign-ups off in Supabase → Authentication → Sign In / Providers.</p></details></div>${loginFoot()}</div>`;
   $('#so').onclick = () => sb.auth.signOut();
   $('#claim').onclick = async () => { const { data, error } = await sb.rpc('claim_first_owner');
     if (error) { $('#cn').className = 'err'; $('#cn').textContent = msg(error); return; }

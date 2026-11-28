@@ -14,4 +14,5 @@
 - Answers and review notes use an in-page box instead of browser pop-ups; toasts replace alerts.
 - Settings: Team card (owner adds people by email as viewer, editor or owner), sign-in methods with passkeys, safety checklist.
 - Connection settings moved to config.js; supabase-js loads with an integrity hash.
+- Version footer on every screen, including sign-in, new password and no-access.
 - Migration 20261127000000_team_by_email.sql: admin_grant(email, role) and admin_team(). Tested on Postgres 16 (supabase/tests/team_test.sql).
